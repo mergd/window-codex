@@ -1,0 +1,9 @@
+{
+  "name": "create-window-codex",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "create-window-codex": "./dist/index.js" },
+  "files": ["dist", "template"],
+  "scripts": { "build": "tsc -p tsconfig.json && chmod +x dist/index.js", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.0" }
+}

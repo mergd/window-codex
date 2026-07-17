@@ -1,0 +1,26 @@
+{
+  "name": "window-codex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "npm run build -w @window-codex/sdk && npm run build -w @window-codex/native-host && npm run build -w create-window-codex && npm run build -w @window-codex/docs && npm run build -w @window-codex/reflex && npm run build -w @window-codex/extension",
+    "dev:docs": "npm run dev -w @window-codex/docs",
+    "dev:reflex": "npm run dev -w @window-codex/reflex",
+    "test": "npm run test --workspaces --if-present && node --test tests/*.test.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "setup:native": "node scripts/setup-native-host.mjs",
+    "smoke:native": "node scripts/smoke-native-host.mjs",
+    "release:pack": "node scripts/package-release.mjs",
+    "deploy:docs": "npm run build -w @window-codex/docs && wrangler pages deploy apps/docs/dist --project-name window-codex-docs",
+    "deploy:reflex": "npm run build -w @window-codex/reflex && wrangler pages deploy apps/reflex/dist --project-name window-codex-reflex"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.4",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

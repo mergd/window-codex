@@ -1,0 +1,17 @@
+{
+  "name": "@window-codex/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite --port 4173", "build": "tsc -b && vite build", "typecheck": "tsc -b --pretty false" },
+  "dependencies": {
+    "@base-ui/react": "^1.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-router": "^1.0.0",
+    "@window-codex/sdk": "0.1.0",
+    "@window-codex/ui": "0.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": { "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0", "@vitejs/plugin-react": "^5.0.0", "typescript": "^5.9.0", "vite": "^7.0.0" }
+}
