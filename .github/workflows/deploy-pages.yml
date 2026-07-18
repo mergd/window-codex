@@ -51,6 +51,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Build shared SDK
+        run: npm run build -w @window-codex/sdk
       - name: Build ${{ matrix.app }}
         run: npm run build -w ${{ matrix.workspace }}
       - name: Deploy ${{ matrix.app }}
