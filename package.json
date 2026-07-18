@@ -13,7 +13,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "setup:native": "node scripts/setup-native-host.mjs",
     "smoke:native": "node scripts/smoke-native-host.mjs",
-    "release:pack": "node scripts/package-release.mjs",
+    "release:pack": "node scripts/package-release.mjs && node scripts/package-bridge.mjs",
     "deploy:docs": "npm run build -w @window-codex/docs && wrangler pages deploy apps/docs/dist --project-name window-codex-docs",
     "deploy:reflex": "npm run build -w @window-codex/reflex && wrangler pages deploy apps/reflex/dist --project-name window-codex-reflex"
   },

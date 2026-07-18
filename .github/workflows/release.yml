@@ -27,5 +27,6 @@ jobs:
         run: >-
           gh release create "${GITHUB_REF_NAME}"
           release-assets/*.tgz
+          release-assets/*.zip
           --generate-notes
           --title "window.codex ${GITHUB_REF_NAME}"

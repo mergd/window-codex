@@ -7,8 +7,33 @@ type Pending = { id: string; origin: string; method: string; params: unknown; ta
 const pending = new Map<string, Pending>();
 const nativeRequests = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 let nativePort: chrome.runtime.Port | null = null;
+let approvalWindowId: number | undefined;
 
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
+async function openApprovalWindow() {
+  if (approvalWindowId !== undefined) {
+    try { await chrome.windows.update(approvalWindowId, { focused: true, drawAttention: true }); return; }
+    catch { approvalWindowId = undefined; }
+  }
+  const current = await chrome.windows.getLastFocused();
+  const width = 388;
+  const height = 650;
+  const created = await chrome.windows.create({
+    url: chrome.runtime.getURL("popup.html"),
+    type: "popup",
+    focused: true,
+    width,
+    height,
+    left: typeof current.left === "number" && typeof current.width === "number" ? Math.max(0, current.left + current.width - width - 16) : undefined,
+    top: typeof current.top === "number" ? current.top + 56 : undefined,
+  });
+  approvalWindowId = created?.id;
+}
+
+chrome.action.onClicked.addListener(() => { void openApprovalWindow(); });
+chrome.windows.onRemoved.addListener(windowId => { if (windowId === approvalWindowId) approvalWindowId = undefined; });
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === "install") void chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") });
+});
 
 function error(code: string, message: string, retryable = false) { return { code, message, data: { retryable } }; }
 function exactOrigin(sender: chrome.runtime.MessageSender) { if (!sender.tab?.url) throw error("PERMISSION_DENIED", "Requests require a top-level web tab"); return new URL(sender.tab.url).origin; }
@@ -19,7 +44,7 @@ function requiredScope(method: CodexMethod): PermissionScope | null { if (method
 
 async function approve(origin: string, method: string, params: unknown, tabId: number) {
   const id = crypto.randomUUID();
-  const response = await new Promise<ApprovalResult>(resolve => { pending.set(id, { id, origin, method, params, tabId, resolve, createdAt: Date.now() }); void chrome.sidePanel.open({ tabId }).catch(() => undefined); });
+  const response = await new Promise<ApprovalResult>(resolve => { pending.set(id, { id, origin, method, params, tabId, resolve, createdAt: Date.now() }); void openApprovalWindow(); });
   pending.delete(id);
   if (!response.allowed) throw error("USER_CANCELLED", "The user rejected this request");
   return response.result;
@@ -85,5 +110,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "ui.pending.list") { sendResponse([...pending.values()].map(({ resolve, ...item }) => item)); return false; }
   if (message?.type === "ui.pending.resolve") { pending.get(message.id)?.resolve({ allowed: Boolean(message.allowed), result: message.result }); sendResponse({ ok: true }); return false; }
   if (message?.type === "ui.runtime.check") { callNative("chrome-extension://self", "provider.info", {}).then(value => sendResponse({ ok: true, value }), reason => sendResponse({ ok: false, message: reason.message })); return true; }
+  if (message?.type === "ui.onboarding.open") { void chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") }); sendResponse({ ok: true }); return false; }
+  if (message?.type === "ui.sidepanel.open") { void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => tab?.id ? chrome.sidePanel.open({ tabId: tab.id }) : undefined); sendResponse({ ok: true }); return false; }
   return false;
 });
