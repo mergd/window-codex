@@ -30,13 +30,13 @@
 .step code { color: #c5c1ff; font: 10px var(--font-mono); }
 .primary, .verify { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 14px; border: 1px solid #635bff; border-radius: 8px; padding: 12px 14px; background: #635bff; color: white; font-size: 11px; font-weight: 650; text-decoration: none; }
 .primary b { font-size: 14px; }
-.verify { display: block; cursor: pointer; font-family: inherit; }
+.verify { display: flex; cursor: pointer; font-family: inherit; }
 .scope { display: flex; justify-content: space-between; margin-top: 12px; padding: 10px 11px; border: 1px solid #2c313b; border-radius: 7px; background: #0f1217; }
 .scope span { color: #747b87; font-size: 10px; }
 .trust { margin-top: 14px; padding: 16px; border: 1px solid #292e37; border-radius: 9px; background: #101319; }
 .trust > span { color: #777f8c; font-size: 8px; letter-spacing: .12em; }
 .trust div { display: flex; align-items: center; gap: 9px; margin-top: 10px; }
 .trust b { font-size: 10px; font-weight: 600; }
-.trust i { color: #676e7a; font-size: 9px; font-style: normal; }
+.trust svg { flex: 0 0 auto; color: #676e7a; }
 .trust p { margin: 9px 0 0; color: #747b87; font-size: 10px; }
 @media (max-width: 520px) { .shell { width: min(100% - 20px, 680px); padding-top: 34px; } .intro h1 { font-size: 38px; } .intro p { font-size: 12px; } .step { padding: 17px; } }

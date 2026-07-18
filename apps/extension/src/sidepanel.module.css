@@ -10,7 +10,7 @@
 .panel header b, .panel header span { display: block; }
 .panel header b { font-size: 12px; letter-spacing: -.01em; }
 .panel header span { margin-top: 1px; color: #8b919d; font-size: 9px; }
-.panel header button, .panel > footer button { border: 0; background: transparent; color: #8b919d; cursor: pointer; font: inherit; }
+.panel header button, .panel > footer button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #8b919d; cursor: pointer; font: inherit; }
 .online, .offline { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #58d68d; }
 .offline { background: #ff6b6b; }
 .network { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-bottom: 1px solid #242830; color: #858c98; font-size: 9px; }
