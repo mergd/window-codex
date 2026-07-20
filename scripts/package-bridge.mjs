@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, renameSync, rmSync, chmodSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, renameSync, rmSync, chmodSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
@@ -14,6 +14,7 @@ execFileSync("zip", ["-qry", "window-codex-bridge-macos.zip", "window-codex-brid
 rmSync(stage, { recursive: true, force: true });
 
 const npmStage = resolve(assets, "codemask-bridge-package");
+const npmPackage = JSON.parse(readFileSync(resolve("installer/npx/package.json"), "utf8"));
 rmSync(npmStage, { recursive: true, force: true });
 mkdirSync(resolve(npmStage, "bridge"), { recursive: true });
 cpSync(resolve("installer/npx/package.json"), resolve(npmStage, "package.json"));
@@ -22,5 +23,5 @@ cpSync(resolve("apps/extension/public/manifest.json"), resolve(npmStage, "manife
 cpSync(resolve("apps/native-host/dist"), resolve(npmStage, "bridge"), { recursive: true });
 chmodSync(resolve(npmStage, "install.mjs"), 0o755);
 execFileSync("npm", ["pack", npmStage, "--pack-destination", assets], { stdio: "inherit" });
-renameSync(resolve(assets, "codemask-bridge-0.1.0.tgz"), resolve(assets, "codemask-bridge.tgz"));
+renameSync(resolve(assets, `codemask-bridge-${npmPackage.version}.tgz`), resolve(assets, "codemask-bridge.tgz"));
 rmSync(npmStage, { recursive: true, force: true });

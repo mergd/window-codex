@@ -22,7 +22,7 @@ On first install, Codemask opens a guided macOS bridge setup. Permission request
 For the packaged developer install:
 
 ```bash
-npx --yes https://cm.fldr.zip/downloads/codemask-bridge.tgz
+npx --yes "https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.1"
 ```
 
 The native setup expects an installed and authenticated `codex` executable. Cloudflare deployment uses the currently authenticated Wrangler account and never receives Codex data.

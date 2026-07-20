@@ -15,7 +15,7 @@ cd my-integration
 npm install
 npm run dev`;
 
-const bridgeInstall = `npx --yes https://cm.fldr.zip/downloads/codemask-bridge.tgz`;
+const bridgeInstall = `npx --yes "https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.1"`;
 
 const requestExample = `const codex = await getCodexProvider()
 
