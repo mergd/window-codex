@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { Link, Outlet, RouterProvider, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { getCodexProvider, type CodexMethod, type CodexProvider } from "@window-codex/sdk";
-import { ArrowRight, Button, CheckCircle, Tabs, WarningCircle } from "@window-codex/ui";
+import { Activity, ArrowRight, Button, CheckCircle, FolderOpen, ShieldCheck, Tabs, WarningCircle } from "@window-codex/ui";
 import "@window-codex/ui/tokens.css";
 import "./font.css";
 import styles from "./styles.module.css";
@@ -28,7 +28,7 @@ await codex.request({
 function Shell() {
   return <div className={styles.shell}>
     <header className={styles.header}>
-      <Link to="/" className={styles.brand}><span className={styles.mark}>wc</span> window.codex</Link>
+      <Link to="/" className={styles.brand}><span className={styles.mark}><Activity size={16}/></span> window.codex</Link>
       <nav><Link to="/quickstart">Quickstart</Link><Link to="/guides">Guides</Link><Link to="/reference">API</Link><Link to="/explorer">Explorer</Link><a href="https://window-codex-reflex.pages.dev">Reflex ↗</a></nav>
     </header>
     <Outlet />
@@ -39,10 +39,10 @@ function Shell() {
 function Home() {
   return <main>
     <section className={styles.hero}>
-      <div><div className={styles.eyebrow}>A browser provider for Codex</div><h1>Let the web ask Codex.<br/><em>Keep the user in control.</em></h1><p>Build integrations that analyze selected work, start confirmed tasks, and stream safe progress—with a familiar wallet-style permission model.</p><div className={styles.actions}><Link className={styles.primary} to="/quickstart">Build an integration</Link><Link className={styles.secondary} to="/explorer">Open provider explorer</Link></div></div>
-      <div className={styles.providerCard}><div className={styles.cardTop}><span className={styles.statusDot}/><span>reflex.window.codex</span><span className={styles.muted}>Connected</span></div><div className={styles.request}><small>PERMISSION REQUEST</small><h3>Analyze 8 Codex threads?</h3><p>Reflex will receive derived findings, never raw transcripts.</p><div className={styles.scope}><span>◫</span><div><b>One-time access</b><small>reflection.v1 · 8 selected threads</small></div></div><div className={styles.inlineButtons}><button>Reject</button><button className={styles.approve}>Approve once</button></div></div></div>
+      <div><div className={styles.eyebrow}>A browser provider for Codex</div><h1>Let the web ask Codex.<br/><em>Keep the user in control.</em></h1><p>Build integrations that analyze selected work, start confirmed tasks, and stream safe progress—with a familiar wallet-style permission model.</p><div className={styles.actions}><Link className={styles.primary} to="/quickstart">Build an integration <ArrowRight size={16}/></Link><Link className={styles.secondary} to="/explorer">Open provider explorer</Link></div></div>
+      <div className={styles.providerCard}><div className={styles.cardTop}><span className={styles.statusDot}/><span>reflex.window.codex</span><span className={styles.muted}>Connected</span></div><div className={styles.request}><small>PERMISSION REQUEST</small><h3>Analyze 8 Codex threads?</h3><p>Reflex will receive derived findings, never raw transcripts.</p><div className={styles.scope}><span><FolderOpen size={18}/></span><div><b>One-time access</b><small>reflection.v1 · 8 selected threads</small></div></div><div className={styles.inlineButtons}><button>Reject</button><button className={styles.approve}>Approve once</button></div></div></div>
     </section>
-    <section className={styles.grid}><article><span>01</span><h2>Discover</h2><p>Feature-detect a stable, typed provider at <code>window.codex</code>.</p></article><article><span>02</span><h2>Ask</h2><p>Request the smallest scope. The extension shows the exact origin and action.</p></article><article><span>03</span><h2>Build</h2><p>Turn insights into confirmed Codex tasks and stream sanitized progress.</p></article></section>
+    <section className={styles.grid}><article><span><Activity size={16}/></span><h2>Discover</h2><p>Feature-detect a stable, typed provider at <code>window.codex</code>.</p></article><article><span><ShieldCheck size={16}/></span><h2>Ask</h2><p>Request the smallest scope. The extension shows the exact origin and action.</p></article><article><span><ArrowRight size={16}/></span><h2>Build</h2><p>Turn insights into confirmed Codex tasks and stream sanitized progress.</p></article></section>
   </main>;
 }
 
