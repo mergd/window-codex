@@ -24,7 +24,7 @@ function resolveAlias(origin: string, kind: string, value: string) { return alia
 function snapshot(task: Task) { const { runtimeThreadId, runtimeTurnId, origin, sequence, ...safe } = task; return safe; }
 function event(event: string, payload: unknown) { write({ type: "event", event, payload }); }
 
-function input(text: string) { return [{ type: "text", text, textElements: [] }]; }
+function input(text: string) { return [{ type: "text", text, text_elements: [] }]; }
 function findTaskByRuntime(threadId: string) { return [...tasks.values()].find(task => task.runtimeThreadId === threadId); }
 
 app.on("notification", (message: any) => {
@@ -58,7 +58,7 @@ async function handle(message: HostMessage) {
     if (method === "provider.info") { write({ id, result: { ready: true, runtime: "codex app-server" } }); return; }
     if (method === "workspace.select") { const workspaceId = alias(origin, "workspace", defaultWorkspace); workspaces.set(`${origin}:${workspaceId}`, defaultWorkspace); write({ id, result: { id: workspaceId, label: basename(defaultWorkspace) } }); return; }
     if (method === "threads.list") {
-      const response = await app.request("thread/list", { cursor: params.cursor ?? null, limit: params.limit ?? 20, sortKey: "updatedAt" });
+      const response = await app.request("thread/list", { cursor: params.cursor ?? null, limit: params.limit ?? 20, sortKey: "updated_at" });
       const data = (response.data ?? []).map((thread: any) => ({ id: alias(origin, "thread", thread.id), title: thread.name || thread.preview || "Untitled Codex task", createdAt: thread.createdAt ?? 0, updatedAt: thread.updatedAt ?? thread.createdAt ?? 0, turnCount: Array.isArray(thread.turns) ? thread.turns.length : 0, workspaceLabel: thread.cwd ? basename(thread.cwd) : null }));
       write({ id, result: { data, nextCursor: response.nextCursor ?? null } }); return;
     }
@@ -87,7 +87,7 @@ async function analyze(origin: string, threadIds: string[]) {
   const histories: Array<{ id: string; content: string }> = []; let truncatedThreads = 0; let total = 0;
   for (const [index, runtimeId] of runtimeIds.entries()) { const response = await app.request("thread/read", { threadId: runtimeId, includeTurns: true }); let encoded = JSON.stringify(response.thread); if (encoded.length > 80_000) { encoded = encoded.slice(-80_000); truncatedThreads += 1; } if (total + encoded.length > 300_000) { truncatedThreads += 1; continue; } total += encoded.length; histories.push({ id: threadIds[index], content: encoded }); }
   const cwd = await mkdtemp(`${tmpdir()}/window-codex-analysis-`);
-  const thread = await app.request("thread/start", { cwd, ephemeral: true, approvalPolicy: "never", sandbox: "readOnly", serviceName: "window_codex_analysis", developerInstructions: "Analyze only the supplied JSON. Do not use tools or inspect the filesystem. Return only JSON matching the requested schema." });
+  const thread = await app.request("thread/start", { cwd, ephemeral: true, approvalPolicy: "never", sandbox: "read-only", serviceName: "window_codex_analysis", developerInstructions: "Analyze only the supplied JSON. Do not use tools or inspect the filesystem. Return only JSON matching the requested schema." });
   const outputSchema = reflectionSchema();
   const prompt = `Analyze these selected Codex thread histories. Identify recurring themes, friction, and actionable improvements. Never quote transcript text. Use only opaque thread IDs in evidence.\n\n${JSON.stringify(histories)}`;
   const completion = waitForTurn(thread.thread.id);
