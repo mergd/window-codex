@@ -3,8 +3,9 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { Link, Outlet, RouterProvider, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { getCodexProvider, type CodexMethod, type CodexProvider } from "@window-codex/sdk";
-import { Button, Tabs } from "@window-codex/ui";
+import { ArrowRight, Button, CheckCircle, Tabs, WarningCircle } from "@window-codex/ui";
 import "@window-codex/ui/tokens.css";
+import "./font.css";
 import styles from "./styles.module.css";
 
 const quickstart = `npx --yes \\
@@ -72,7 +73,14 @@ function Explorer() {
   const discovery = useQuery({ queryKey: ["provider"], queryFn: () => getCodexProvider({ timeoutMs: 800 }), retry: false });
   const connect = useMutation({ mutationFn: async () => { const value = discovery.data ?? await getCodexProvider(); setProvider(value); return value.request({ method: "connect", params: { protocolVersion: "0.1", scopes: ["threads:metadata"] } }); }, onSuccess: value => setOutput(JSON.stringify(value, null, 2)), onError: error => setOutput(String(error)) });
   const send = async () => { try { const active = provider ?? discovery.data ?? await getCodexProvider(); setProvider(active); const params = method === "threads.list" ? { limit: 5 } : {}; const value = await active.request({ method, params } as never); setOutput(JSON.stringify(value, null, 2)); } catch (error) { setOutput(String(error)); } };
-  return <Article eyebrow="Live provider explorer" title="See the boundary in action."><div className={styles.explorer}><div className={styles.explorerHeader}><span className={discovery.data ? styles.goodDot : styles.badDot}/><div><b>{discovery.data ? "Provider detected" : "Provider unavailable"}</b><small>{discovery.data ? "Ready for requests" : "Load the extension or use the generated mock"}</small></div><Button className={styles.button} onClick={() => connect.mutate()}>Connect</Button></div><Tabs.Root defaultValue="request"><Tabs.List className={styles.tabs}><Tabs.Tab value="request">Request</Tabs.Tab><Tabs.Tab value="response">Response</Tabs.Tab></Tabs.List><Tabs.Panel value="request" className={styles.panel}><label>Method<select value={method} onChange={e => setMethod(e.target.value as CodexMethod)}>{methods.slice(0, 8).map(([name]) => <option key={name}>{name}</option>)}</select></label><Button className={styles.button} onClick={() => void send()}>Send request</Button></Tabs.Panel><Tabs.Panel value="response" className={styles.panel}><pre>{output}</pre></Tabs.Panel></Tabs.Root></div></Article>;
+  return <Article eyebrow="Live provider explorer" title="See the boundary in action.">
+    {discovery.isError ? <section className={styles.setupCard}>
+      <div className={styles.setupIcon}><WarningCircle size={24}/></div>
+      <div className={styles.setupCopy}><span>SETUP REQUIRED</span><h2>Connect this browser to Codex</h2><p>The provider is not installed in this browser yet. Add the extension, install the local macOS bridge, then return here to make your first request.</p></div>
+      <ol className={styles.setupSteps}><li><span>1</span><div><b>Add the Chrome extension</b><small>Load the unpacked extension for the hackathon build.</small></div></li><li><span>2</span><div><b>Install the local bridge</b><small>The bridge connects Chrome directly to your authenticated Codex runtime.</small></div></li><li><span>3</span><div><b>Retry detection</b><small>No Codex data is sent through this documentation site.</small></div></li></ol>
+      <div className={styles.setupActions}><Link className={styles.setupPrimary} to="/quickstart">Open setup guide <ArrowRight size={17}/></Link><Button className={styles.setupSecondary} onClick={() => void discovery.refetch()}>Check again</Button></div>
+    </section> : <div className={styles.explorer}><div className={styles.explorerHeader}><CheckCircle size={22} className={styles.connectedIcon}/><div><b>Provider detected</b><small>Extension available · ready for requests</small></div><Button className={styles.button} onClick={() => connect.mutate()}>{connect.isPending ? "Waiting for approval…" : "Connect"}</Button></div><Tabs.Root defaultValue="request"><Tabs.List className={styles.tabs}><Tabs.Tab value="request">Request</Tabs.Tab><Tabs.Tab value="response">Response</Tabs.Tab></Tabs.List><Tabs.Panel value="request" className={styles.panel}><label>Method<select value={method} onChange={e => setMethod(e.target.value as CodexMethod)}>{methods.slice(0, 8).map(([name]) => <option key={name}>{name}</option>)}</select></label><Button className={styles.button} onClick={() => void send()}>Send request</Button></Tabs.Panel><Tabs.Panel value="response" className={styles.panel}><pre>{output}</pre></Tabs.Panel></Tabs.Root></div>}
+  </Article>;
 }
 
 function Callout({ children }: { children: React.ReactNode }) { return <div className={styles.callout}><b>Good to know</b><span>{children}</span></div>; }
