@@ -19,7 +19,7 @@ const key = Buffer.from(manifest.key, "base64");
 const extensionId = [...createHash("sha256").update(key).digest().subarray(0, 16)]
   .map(byte => `${String.fromCharCode(97 + (byte >> 4))}${String.fromCharCode(97 + (byte & 15))}`)
   .join("");
-const codex = execFileSync("which", ["codex"], { encoding: "utf8" }).trim();
+const codex = process.env.CODEMASK_CODEX_BIN || execFileSync("which", ["codex"], { encoding: "utf8" }).trim();
 const support = resolve(installHome, ".codemask");
 const bridge = resolve(support, "bridge");
 const launcher = resolve(support, "native-host.sh");

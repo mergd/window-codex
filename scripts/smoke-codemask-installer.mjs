@@ -12,6 +12,7 @@ try {
     env: {
       ...process.env,
       CODEMASK_ALLOW_TEST_PLATFORM: "1",
+      CODEMASK_CODEX_BIN: process.execPath,
       CODEMASK_INSTALL_HOME: fixture,
       CODEMASK_CHROME_DIR: chromeDir,
       CODEMASK_DEFAULT_WORKSPACE: resolve(fixture, "workspace"),
