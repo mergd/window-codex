@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAogfaSMiirryxcThybxEMYV/XW+ftRDbU8AjLnnPUiY91ITEB2EJsIXnNpffs/z2OSuV4ZWMyfDH7y4qBeMMtUPjfjsQqNBf4uH/fm7alEBpvVwu8AjzeCkXGW8sV+1dNrgs39z+c6V3m62r8B4bGGgfmhSEiLPGmOJOmq0Qm44DDAWuiODd/NzIEW4f52ZC3km2LYbkEJG1AJFi0asFL6gDOPWNFK4Hbyhn/Kwid4T6E0NDX6lwFUBfTqSBrsfYAvpG4iC9R0E2Ey8dhPdtFnc0TLRLzLlYYwXx8RBBujECZWNZiqgZdaAQ/01XuT0y05x7hptQ7L8rcHnIaPxMqUQIDAQAB",
   "permissions": ["nativeMessaging", "storage", "sidePanel", "tabs"],
-  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://*.pages.dev/*", "https://*.window.codex/*"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*", "https://cm.fldr.zip/*", "https://reflex.cm.fldr.zip/*", "https://*.pages.dev/*", "https://*.window.codex/*"],
   "background": { "service_worker": "serviceWorker.js", "type": "module" },
   "icons": {
     "16": "icons/icon-16.png",

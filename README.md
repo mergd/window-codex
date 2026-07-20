@@ -22,14 +22,14 @@ On first install, Codemask opens a guided macOS bridge setup. Permission request
 For the packaged developer install:
 
 ```bash
-npx --yes https://window-codex-docs.pages.dev/downloads/codemask-bridge.tgz
+npx --yes https://cm.fldr.zip/downloads/codemask-bridge.tgz
 ```
 
 The native setup expects an installed and authenticated `codex` executable. Cloudflare deployment uses the currently authenticated Wrangler account and never receives Codex data.
 
 See [SPEC.md](./SPEC.md), [SECURITY.md](./SECURITY.md), and [REFLEX.md](./REFLEX.md).
 
-Hosted demos: [Docs](https://window-codex-docs.pages.dev) and [Reflex](https://window-codex-reflex.pages.dev).
+Hosted demos: [Docs](https://cm.fldr.zip) and [Reflex](https://reflex.cm.fldr.zip).
 
 ## Release distribution
 

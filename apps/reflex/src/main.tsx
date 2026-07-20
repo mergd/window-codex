@@ -10,7 +10,7 @@ import styles from "./styles.module.css";
 type AppState = { provider: CodexProvider | null; selected: string[]; reflection: ReflectionResult | null; workspace: { id: string; label: string } | null; task: TaskSnapshot | null };
 const state: AppState = { provider: null, selected: [], reflection: null, workspace: null, task: null };
 
-function Shell() { return <div className={styles.shell}><header><Link to="/" className={styles.brand}><span>R</span> Reflex</Link><div className={styles.powered}>Powered by <b>Codemask</b></div><a href="https://window-codex-docs.pages.dev">Docs ↗</a></header><Outlet/></div>; }
+function Shell() { return <div className={styles.shell}><header><Link to="/" className={styles.brand}><span>R</span> Reflex</Link><div className={styles.powered}>Powered by <b>Codemask</b></div><a href="https://cm.fldr.zip">Docs ↗</a></header><Outlet/></div>; }
 
 function Landing() {
   const navigate = useNavigate();

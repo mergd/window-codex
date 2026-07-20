@@ -9,7 +9,7 @@ import styles from "./sidepanel.module.css";
 type Pending = { id: string; origin: string; method: string; params: Record<string, unknown>; createdAt: number };
 const hasExtensionRuntime = () => typeof globalThis.chrome !== "undefined" && Boolean(globalThis.chrome.runtime?.id);
 const assetUrl = (path: string) => hasExtensionRuntime() ? chrome.runtime.getURL(path) : `/${path}`;
-const demoPending: Pending[] = [{ id: "preview", origin: "https://window-codex-docs.pages.dev", method: "connect", params: { scopes: ["threads:metadata"] }, createdAt: Date.now() }];
+const demoPending: Pending[] = [{ id: "preview", origin: "https://cm.fldr.zip", method: "connect", params: { scopes: ["threads:metadata"] }, createdAt: Date.now() }];
 const send = (message: unknown) => hasExtensionRuntime() ? chrome.runtime.sendMessage(message) : Promise.resolve((message as { type?: string }).type === "ui.pending.list" ? demoPending : (message as { type?: string }).type === "ui.runtime.check" ? { ok: false } : { ok: true });
 const labels: Record<string, [string, string]> = {
   connect: ["Connect this site?", "Choose which Codex capabilities this origin can request."],

@@ -15,7 +15,7 @@ cd my-integration
 npm install
 npm run dev`;
 
-const bridgeInstall = `npx --yes https://window-codex-docs.pages.dev/downloads/codemask-bridge.tgz`;
+const bridgeInstall = `npx --yes https://cm.fldr.zip/downloads/codemask-bridge.tgz`;
 
 const requestExample = `const codex = await getCodexProvider()
 
@@ -31,7 +31,7 @@ function Shell() {
   return <div className={styles.shell}>
     <header className={styles.header}>
       <Link to="/" className={styles.brand}><span className={styles.mark}><Activity size={16}/></span> Codemask</Link>
-      <nav><Link to="/quickstart">Quickstart</Link><Link to="/guides">Guides</Link><Link to="/reference">API</Link><Link to="/explorer">Explorer</Link><a href="https://window-codex-reflex.pages.dev">Reflex ↗</a></nav>
+      <nav><Link to="/quickstart">Quickstart</Link><Link to="/guides">Guides</Link><Link to="/reference">API</Link><Link to="/explorer">Explorer</Link><a href="https://reflex.cm.fldr.zip">Reflex ↗</a></nav>
     </header>
     <Outlet />
     <footer><span>Codemask · window.codex 0.1</span><span>Local-first by design</span></footer>
