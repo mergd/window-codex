@@ -29,4 +29,4 @@ jobs:
           release-assets/*.tgz
           release-assets/*.zip
           --generate-notes
-          --title "window.codex ${GITHUB_REF_NAME}"
+          --title "Codemask ${GITHUB_REF_NAME}"

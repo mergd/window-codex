@@ -79,7 +79,7 @@ async function broadcast(event: string, payload: unknown) { for (const tab of aw
 async function handleProvider(message: { method: CodexMethod; params: any }, sender: chrome.runtime.MessageSender) {
   if (!METHODS.includes(message.method)) throw error("UNSUPPORTED_METHOD", `Unsupported method: ${String(message.method)}`);
   const origin = exactOrigin(sender); const tabId = sender.tab!.id!; const current = await grantsFor(origin);
-  if (message.method === "provider.info") return { name: "window.codex", protocolVersion: PROTOCOL_VERSION, providerVersion: chrome.runtime.getManifest().version, connected: current.length > 0 };
+  if (message.method === "provider.info") return { name: "Codemask", protocolVersion: PROTOCOL_VERSION, providerVersion: chrome.runtime.getManifest().version, connected: current.length > 0 };
   if (message.method === "capabilities.list") return { methods: METHODS, recipes: ["reflection.v1"] };
   if (message.method === "permissions.get") return { grants: current };
   if (message.method === "disconnect") { await storeGrants(origin, []); await broadcast("provider.disconnected", { reason: "Disconnected by site" }); return { disconnected: true }; }

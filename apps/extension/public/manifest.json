@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "window.codex",
+  "name": "Codemask",
   "description": "A permissioned browser provider for Codex.",
   "version": "0.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAogfaSMiirryxcThybxEMYV/XW+ftRDbU8AjLnnPUiY91ITEB2EJsIXnNpffs/z2OSuV4ZWMyfDH7y4qBeMMtUPjfjsQqNBf4uH/fm7alEBpvVwu8AjzeCkXGW8sV+1dNrgs39z+c6V3m62r8B4bGGgfmhSEiLPGmOJOmq0Qm44DDAWuiODd/NzIEW4f52ZC3km2LYbkEJG1AJFi0asFL6gDOPWNFK4Hbyhn/Kwid4T6E0NDX6lwFUBfTqSBrsfYAvpG4iC9R0E2Ey8dhPdtFnc0TLRLzLlYYwXx8RBBujECZWNZiqgZdaAQ/01XuT0y05x7hptQ7L8rcHnIaPxMqUQIDAQAB",
@@ -20,7 +20,7 @@
   "web_accessible_resources": [{ "resources": ["inpage.js", "chunks/*"], "matches": ["http://*/*", "https://*/*"] }],
   "side_panel": { "default_path": "sidepanel.html" },
   "action": {
-    "default_title": "Open window.codex",
+    "default_title": "Open Codemask",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"

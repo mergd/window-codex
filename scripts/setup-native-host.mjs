@@ -12,11 +12,11 @@ const extensionId = [...createHash("sha256").update(key).digest().subarray(0, 16
 const codex = execFileSync("which", ["codex"], { encoding: "utf8" }).trim();
 const node = process.execPath;
 const hostEntry = resolve(root, "apps/native-host/dist/index.js");
-const support = resolve(homedir(), ".window-codex");
+const support = resolve(homedir(), ".codemask");
 const launcher = resolve(support, "native-host.sh");
 const chromeDir = resolve(homedir(), "Library/Application Support/Google/Chrome/NativeMessagingHosts");
 mkdirSync(support, { recursive: true }); mkdirSync(chromeDir, { recursive: true });
 writeFileSync(launcher, `#!/bin/sh\nexport WINDOW_CODEX_CODEX_BIN=${JSON.stringify(codex)}\nexport WINDOW_CODEX_DEFAULT_WORKSPACE=${JSON.stringify(process.env.WINDOW_CODEX_DEFAULT_WORKSPACE || root)}\nexec ${JSON.stringify(node)} ${JSON.stringify(hostEntry)}\n`);
 chmodSync(launcher, 0o755);
-writeFileSync(resolve(chromeDir, "com.window.codex.json"), JSON.stringify({ name: "com.window.codex", description: "Local Codex bridge for window.codex", path: launcher, type: "stdio", allowed_origins: [`chrome-extension://${extensionId}/`] }, null, 2));
-console.log(`Registered com.window.codex for extension ${extensionId}`);
+writeFileSync(resolve(chromeDir, "com.window.codex.json"), JSON.stringify({ name: "com.window.codex", description: "Local Codex bridge for Codemask", path: launcher, type: "stdio", allowed_origins: [`chrome-extension://${extensionId}/`] }, null, 2));
+console.log(`Registered Codemask bridge for extension ${extensionId}`);

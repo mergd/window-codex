@@ -53,6 +53,12 @@ jobs:
       - run: npm ci
       - name: Build shared SDK
         run: npm run build -w @window-codex/sdk
+      - name: Package Codemask bridge installer
+        if: matrix.app == 'docs'
+        run: |
+          npm run package:bridge
+          mkdir -p apps/docs/public/downloads
+          cp release-assets/codemask-bridge.tgz apps/docs/public/downloads/codemask-bridge.tgz
       - name: Build ${{ matrix.app }}
         run: npm run build -w ${{ matrix.workspace }}
       - name: Deploy ${{ matrix.app }}

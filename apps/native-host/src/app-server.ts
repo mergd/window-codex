@@ -15,7 +15,7 @@ export class AppServer extends EventEmitter {
     this.child.stderr.on("data", chunk => process.stderr.write(`[codex] ${chunk}`));
     this.child.on("exit", (code, signal) => { this.child = null; const failure = new Error(`codex app-server exited (${code ?? signal})`); this.pending.forEach(item => item.reject(failure)); this.pending.clear(); this.emit("exit", failure); });
     createInterface({ input: this.child.stdout }).on("line", line => { try { this.handle(JSON.parse(line)); } catch (error) { process.stderr.write(`[window.codex] invalid app-server frame: ${String(error)}\n`); } });
-    await this.request("initialize", { clientInfo: { name: "window_codex", title: "window.codex browser provider", version: "0.1.0" }, capabilities: { experimentalApi: false } });
+    await this.request("initialize", { clientInfo: { name: "codemask", title: "Codemask browser provider", version: "0.1.0" }, capabilities: { experimentalApi: false } });
     this.notify("initialized", {});
   }
 

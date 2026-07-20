@@ -1,6 +1,6 @@
-# window.codex
+# Codemask
 
-`window.codex` is a browser provider for Codex. It pairs a Chrome extension and local native host with a typed SDK, developer documentation, and Reflex—the reference history-analysis integration.
+Codemask is a developer wallet for Codex. The product injects the stable `window.codex` browser provider and pairs a Chrome extension with a local native host, typed SDK, developer documentation, and Reflex—the reference history-analysis integration.
 
 ## Quick start
 
@@ -17,7 +17,13 @@ npm run dev:docs
 npm run dev:reflex
 ```
 
-On first install, the extension opens a guided macOS bridge setup. Permission requests open in a focused wallet-style extension window; the side panel remains available for ongoing activity and connected-site management.
+On first install, Codemask opens a guided macOS bridge setup. Permission requests open in a focused wallet-style extension window; the side panel remains available for ongoing activity and connected-site management.
+
+For the packaged developer install:
+
+```bash
+npx --yes https://window-codex-docs.pages.dev/downloads/codemask-bridge.tgz
+```
 
 The native setup expects an installed and authenticated `codex` executable. Cloudflare deployment uses the currently authenticated Wrangler account and never receives Codex data.
 
@@ -37,7 +43,7 @@ npx --yes \
 
 Create the two release archives locally with `npm run release:pack`. Pushing a `v*` tag runs the release workflow and attaches the SDK and scaffolder archives to that GitHub release.
 
-The release also contains `window-codex-bridge-macos.zip`, which is linked from extension onboarding and registers the native messaging host for the pinned extension ID.
+The release also contains `codemask-bridge.tgz`, the executable npx installer used by onboarding. The legacy ZIP remains available during the hackathon transition.
 
 ## Cloudflare CI
 
