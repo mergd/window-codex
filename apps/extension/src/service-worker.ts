@@ -162,10 +162,12 @@ async function handleProvider(message: { method: CodexMethod; params: any }, sen
   if (message.method === "permissions.revoke") { const next = message.params.grantId ? current.filter(grant => grant.id !== message.params.grantId) : []; await storeGrants(origin, next); return { revoked: true }; }
   if (message.method === "connect") {
     if (message.params.protocolVersion !== PROTOCOL_VERSION) throw error("UNSUPPORTED_VERSION", "This provider supports protocol 0.1");
+    const requestedScopes = [...new Set(message.params.scopes)] as PermissionScope[];
+    const grantedScopes = new Set(current.flatMap(grant => grant.scopes));
+    if (current.length > 0 && requestedScopes.every(scope => grantedScopes.has(scope))) return { connected: true, grants: current };
     const decision = await approve(origin, message.method, message.params, tabId) as { fastMode?: boolean } | undefined;
     if (decision?.fastMode) await storePreference(origin, { fastMode: true, blocked: false });
-    const scopes = [...new Set(message.params.scopes)] as PermissionScope[];
-    const grant: Grant = { id: crypto.randomUUID(), origin, scopes, persistence: "persistent", createdAt: Math.floor(Date.now() / 1000) };
+    const grant: Grant = { id: crypto.randomUUID(), origin, scopes: requestedScopes, persistence: "persistent", createdAt: Math.floor(Date.now() / 1000) };
     const grants = [...current, grant]; await storeGrants(origin, grants); await broadcast("provider.connected", { origin }); return { connected: true, grants };
   }
   if (message.method === "permissions.request") {

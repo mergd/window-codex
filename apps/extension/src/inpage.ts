@@ -17,13 +17,17 @@ const provider: CodexProvider = Object.freeze({
     const id = `${Date.now()}:${nextId++}`;
     return new Promise<CodexMethodResults[M]>((resolve, reject) => {
       const abort = () => { cleanup(); reject(new ProviderError("USER_CANCELLED", "Request cancelled")); };
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new ProviderError("RUNTIME_UNAVAILABLE", "Codemask stopped responding. Reload this page and try again."));
+      }, 60_000);
       const receive = (event: MessageEvent) => {
         if (event.source !== window || event.data?.type !== RESPONSE || event.data.id !== id) return;
         cleanup();
         if (event.data.error) reject(new ProviderError(event.data.error.code, event.data.error.message, event.data.error.data));
         else resolve(event.data.result);
       };
-      const cleanup = () => { window.removeEventListener("message", receive); options?.signal?.removeEventListener("abort", abort); };
+      const cleanup = () => { clearTimeout(timeout); window.removeEventListener("message", receive); options?.signal?.removeEventListener("abort", abort); };
       if (options?.signal?.aborted) return abort();
       options?.signal?.addEventListener("abort", abort, { once: true });
       window.addEventListener("message", receive);
