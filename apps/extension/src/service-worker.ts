@@ -7,8 +7,10 @@ type Pending = { id: string; origin: string; method: string; params: unknown; ta
 type SiteAction = { method: string; label: string; at: number };
 type SiteActivity = { origin: string; scopes: PermissionScope[]; actionCount: number; inputTokens: number; outputTokens: number; totalTokens: number; connectedAt: number; lastActiveAt: number; recentActions: SiteAction[] };
 type TaskUsage = { origin: string; inputTokens: number; outputTokens: number; totalTokens: number };
+type SitePreference = { fastMode: boolean; blocked: boolean };
 const pending = new Map<string, Pending>();
 const nativeRequests = new Map<string, { tabId?: number; resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const workspaceLabels = new Map<string, string>();
 let nativePort: chrome.runtime.Port | null = null;
 let approvalWindowId: number | undefined;
 let activityWrite: Promise<void> = Promise.resolve();
@@ -56,6 +58,8 @@ function error(code: string, message: string, retryable = false) { return { code
 function exactOrigin(sender: chrome.runtime.MessageSender) { if (!sender.tab?.url) throw error("PERMISSION_DENIED", "Requests require a top-level web tab"); return new URL(sender.tab.url).origin; }
 async function grantsFor(origin: string): Promise<Grant[]> { const stored = await chrome.storage.local.get("grants"); const byOrigin = (stored.grants ?? {}) as Record<string, Grant[]>; return byOrigin[origin] ?? []; }
 async function storeGrants(origin: string, grants: Grant[]) { const stored = await chrome.storage.local.get("grants"); const byOrigin = (stored.grants ?? {}) as Record<string, Grant[]>; await chrome.storage.local.set({ grants: { ...byOrigin, [origin]: grants } }); await broadcast("permissions.changed", { grants }); }
+async function preferenceFor(origin: string): Promise<SitePreference> { const stored = await chrome.storage.local.get("sitePreferences"); return ((stored.sitePreferences ?? {}) as Record<string, SitePreference>)[origin] ?? { fastMode: false, blocked: false }; }
+async function storePreference(origin: string, patch: Partial<SitePreference>) { const stored = await chrome.storage.local.get("sitePreferences"); const preferences = (stored.sitePreferences ?? {}) as Record<string, SitePreference>; const next = { ...(preferences[origin] ?? { fastMode: false, blocked: false }), ...patch }; await chrome.storage.local.set({ sitePreferences: { ...preferences, [origin]: next } }); return next; }
 function hasScope(grants: Grant[], scope: PermissionScope) { return grants.some(grant => grant.scopes.includes(scope)); }
 function requiredScope(method: CodexMethod): PermissionScope | null { if (method === "threads.list") return "threads:metadata"; if (method === "threads.analyze") return "threads:analyze"; if (method === "tasks.start") return "tasks:create"; if (["tasks.get", "tasks.send", "tasks.cancel"].includes(method)) return "tasks:control"; return null; }
 
@@ -89,7 +93,7 @@ function recordUsage(payload: TaskUsage & { taskId: string }) {
 
 async function listActivity() {
   await activityWrite;
-  const stored = await chrome.storage.local.get(["siteActivity", "grants"]);
+  const stored = await chrome.storage.local.get(["siteActivity", "grants", "sitePreferences"]);
   const sites = { ...((stored.siteActivity ?? {}) as Record<string, SiteActivity>) };
   const grants = (stored.grants ?? {}) as Record<string, Grant[]>;
   for (const [origin, originGrants] of Object.entries(grants)) {
@@ -98,14 +102,17 @@ async function listActivity() {
     const current = sites[origin] ?? { origin, scopes: [], actionCount: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, connectedAt: createdAt, lastActiveAt: createdAt, recentActions: [] };
     sites[origin] = { ...current, scopes: [...new Set([...current.scopes, ...originGrants.flatMap(grant => grant.scopes)])] };
   }
-  return Object.values(sites).map(site => ({ ...site, connected: Boolean(grants[site.origin]?.length) })).sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+  const preferences = (stored.sitePreferences ?? {}) as Record<string, SitePreference>;
+  const now = Math.floor(Date.now() / 1000);
+  for (const origin of Object.keys(preferences)) if (!sites[origin]) sites[origin] = { origin, scopes: [], actionCount: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, connectedAt: now, lastActiveAt: now, recentActions: [] };
+  return Object.values(sites).map(site => ({ ...site, connected: Boolean(grants[site.origin]?.length), fastMode: preferences[site.origin]?.fastMode ?? false, blocked: preferences[site.origin]?.blocked ?? false })).sort((a, b) => b.lastActiveAt - a.lastActiveAt);
 }
 
 async function approve(origin: string, method: string, params: unknown, tabId: number) {
   const id = crypto.randomUUID();
   const response = await new Promise<ApprovalResult>(resolve => { pending.set(id, { id, origin, method, params, tabId, resolve, createdAt: Date.now() }); void openApprovalWindow(); });
   pending.delete(id);
-  if (!response.allowed) throw error("USER_CANCELLED", "The user rejected this request");
+  if (!response.allowed) { if ((response.result as { blockOrigin?: boolean } | undefined)?.blockOrigin) await storePreference(origin, { blocked: true, fastMode: false }); throw error("USER_CANCELLED", "The user rejected this request"); }
   return response.result;
 }
 
@@ -143,14 +150,17 @@ async function broadcast(event: string, payload: unknown) { for (const tab of aw
 async function handleProvider(message: { method: CodexMethod; params: any }, sender: chrome.runtime.MessageSender) {
   if (!METHODS.includes(message.method)) throw error("UNSUPPORTED_METHOD", `Unsupported method: ${String(message.method)}`);
   const origin = exactOrigin(sender); const tabId = sender.tab!.id!; const current = await grantsFor(origin);
+  const preference = await preferenceFor(origin);
   if (message.method === "provider.info") return { name: "Codemask", protocolVersion: PROTOCOL_VERSION, providerVersion: chrome.runtime.getManifest().version, connected: current.length > 0 };
   if (message.method === "capabilities.list") return { methods: METHODS, recipes: ["reflection.v1"] };
+  if (preference.blocked && message.method !== "disconnect") throw error("PERMISSION_DENIED", "This site is blocked in Codemask");
   if (message.method === "permissions.get") return { grants: current };
   if (message.method === "disconnect") { await storeGrants(origin, []); await broadcast("provider.disconnected", { reason: "Disconnected by site" }); return { disconnected: true }; }
   if (message.method === "permissions.revoke") { const next = message.params.grantId ? current.filter(grant => grant.id !== message.params.grantId) : []; await storeGrants(origin, next); return { revoked: true }; }
   if (message.method === "connect") {
     if (message.params.protocolVersion !== PROTOCOL_VERSION) throw error("UNSUPPORTED_VERSION", "This provider supports protocol 0.1");
-    await approve(origin, message.method, message.params, tabId);
+    const decision = await approve(origin, message.method, message.params, tabId) as { fastMode?: boolean } | undefined;
+    if (decision?.fastMode) await storePreference(origin, { fastMode: true, blocked: false });
     const scopes = [...new Set(message.params.scopes)] as PermissionScope[];
     const grant: Grant = { id: crypto.randomUUID(), origin, scopes, persistence: "persistent", createdAt: Math.floor(Date.now() / 1000) };
     const grants = [...current, grant]; await storeGrants(origin, grants); await broadcast("provider.connected", { origin }); return { connected: true, grants };
@@ -162,17 +172,25 @@ async function handleProvider(message: { method: CodexMethod; params: any }, sen
   }
   const scope = requiredScope(message.method);
   if (scope && !hasScope(current, scope) && !APPROVALS.has(message.method)) throw error("PERMISSION_REQUIRED", `${scope} is required`);
-  if (APPROVALS.has(message.method)) await approve(origin, message.method, message.params, tabId);
+  const workspaceLabel = message.method === "tasks.start" ? workspaceLabels.get(`${origin}:${message.params.workspaceId}`) : undefined;
+  const approvalParams = workspaceLabel ? { ...message.params, workspaceLabel } : message.params;
+  if (APPROVALS.has(message.method) && !preference.fastMode) {
+    const decision = await approve(origin, message.method, approvalParams, tabId) as { fastMode?: boolean } | undefined;
+    if (decision?.fastMode) await storePreference(origin, { fastMode: true, blocked: false });
+  }
   if (message.method === "threads.analyze") {
     if (!Array.isArray(message.params.threadIds) || message.params.threadIds.length < 1) throw error("INVALID_SELECTOR", "Select at least one thread");
   }
-  return callNative(origin, message.method, message.params, tabId);
+  const result = await callNative(origin, message.method, message.params, tabId);
+  if (message.method === "workspace.select" && result && typeof result === "object" && "id" in result && "label" in result) workspaceLabels.set(`${origin}:${String(result.id)}`, String(result.label));
+  return result;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "provider.request") { handleProvider(message, sender).then(async value => { const origin = exactOrigin(sender); await recordActivity(origin, message.method, message.params); sendResponse(value); }, reason => sendResponse({ __error: { code: reason.code ?? "RUNTIME_ERROR", message: reason.message ?? String(reason), data: reason.data } })); return true; }
   if (message?.type === "ui.pending.list") { sendResponse([...pending.values()].map(({ resolve, ...item }) => item)); return false; }
   if (message?.type === "ui.activity.list") { listActivity().then(sendResponse); return true; }
+  if (message?.type === "ui.site.preference") { storePreference(message.origin, { fastMode: message.fastMode, blocked: message.blocked }).then(sendResponse); return true; }
   if (message?.type === "ui.pending.resolve") { pending.get(message.id)?.resolve({ allowed: Boolean(message.allowed), result: message.result }); sendResponse({ ok: true }); return false; }
   if (message?.type === "ui.runtime.check") { callNative("chrome-extension://self", "provider.info", {}).then(value => sendResponse({ ok: true, value }), reason => sendResponse({ ok: false, message: reason.message })); return true; }
   if (message?.type === "ui.onboarding.open") { void chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") }); sendResponse({ ok: true }); return false; }

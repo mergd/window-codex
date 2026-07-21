@@ -49,6 +49,9 @@
 .latest b { font-size: 10px; font-weight: 550; }
 .latest small { margin-top: 2px; color: #707784; font-size: 9px; }
 .site > p { margin: 11px 0 0 42px; color: #777f8c; font-size: 9px; line-height: 1.45; }
+.siteControls { display: flex; gap: 7px; margin: 12px 0 0 42px; }
+.siteControls button { border: 1px solid #303641; border-radius: 6px; padding: 6px 8px; background: #14171d; color: #969da9; cursor: pointer; font: 9px "DM Sans", sans-serif; }
+.siteControls button:last-child { color: #d58c91; }
 .usageNote { margin: 16px 0 0; color: #676e79; font-size: 9px; line-height: 1.5; }
 .empty { margin-top: 8px; padding: 22px 0; border-top: 1px solid #292d35; border-bottom: 1px solid #292d35; }
 .empty b { font-size: 11px; }
@@ -83,8 +86,17 @@
 .warning { display: grid; gap: 2px; margin: 10px 0; padding: 9px 10px; border-left: 2px solid #635bff; background: #151821; }
 .warning b { font-size: 11px; }
 .warning span { color: #858c98; font-size: 10px; line-height: 1.4; }
+.preferenceList { display: grid; margin: 4px 0 12px; border-top: 1px solid #292d35; }
+.preferenceList label { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 9px; padding: 11px 1px; border-bottom: 1px solid #292d35; cursor: pointer; }
+.preferenceList b, .preferenceList small { display: block; }
+.preferenceList b { font-size: 10px; font-weight: 600; }
+.preferenceList small { margin-top: 3px; color: #7f8692; font-size: 9px; line-height: 1.4; }
+.preferenceCheck { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid #3c424d; border-radius: 5px; background: #15181e; color: white; cursor: pointer; }
+.preferenceCheck[data-checked] { border-color: #635bff; background: #635bff; }
 .actions { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin: auto -20px -18px; padding: 13px 20px 18px; border-top: 1px solid #292d35; background: #0d0f13; }
-.reject, .approve { border: 1px solid #343943; border-radius: 8px; padding: 12px; background: #15181e; color: #e2e3e6; font: 650 12px "DM Sans", sans-serif; cursor: pointer; }
+.actionsWithBlock { grid-template-columns: .85fr .85fr 1.4fr; }
+.block, .reject, .approve { border: 1px solid #343943; border-radius: 8px; padding: 12px 7px; background: #15181e; color: #e2e3e6; font: 650 11px "DM Sans", sans-serif; cursor: pointer; }
+.block { color: #d58c91; }
 .approve { border-color: #635bff; background: #635bff; color: white; }
 .approve:disabled { opacity: .45; cursor: not-allowed; }
 .question { display: grid; gap: 6px; margin: 10px 0; }
