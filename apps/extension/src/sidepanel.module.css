@@ -28,6 +28,11 @@
 .home, .request { flex: 1; min-height: 0; padding: 28px 20px 18px; }
 .home { text-align: center; }
 .request { display: flex; flex-direction: column; overflow-y: auto; }
+.confirmation { flex: 1; display: grid; place-content: center; justify-items: center; min-height: 0; padding: 36px 28px; text-align: center; }
+.confirmation > div { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 16px; border: 1px solid #2f5742; border-radius: 11px; background: #131d19; color: #58d68d; }
+.confirmation h1 { margin: 0 0 8px; font-size: 24px; font-weight: 450; line-height: 1.16; letter-spacing: -.035em; }
+.confirmation p { max-width: 265px; margin: 0; color: #9399a4; font-size: 13px; line-height: 1.55; }
+.confirmation small { margin-top: 20px; color: #707784; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .heroIcon { display: grid; place-items: center; width: 48px; height: 48px; margin: 8px auto 18px; border: 1px solid #4943aa; border-radius: 11px; color: #8e88ff; background: #171a24; font-size: 18px; font-weight: 750; }
 .home h1, .request h1 { margin: 8px 0 8px; font-size: 24px; font-weight: 450; line-height: 1.16; letter-spacing: -.035em; }
 .home > p, .request > p { margin: 0 0 22px; color: #9399a4; font-size: 13px; line-height: 1.55; }

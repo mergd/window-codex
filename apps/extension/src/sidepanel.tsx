@@ -11,6 +11,7 @@ document.documentElement.dataset.theme = "dark";
 type Pending = { id: string; origin: string; method: string; params: Record<string, unknown>; createdAt: number };
 type RuntimeProfile = { type: "chatgpt" | "apiKey"; email: string | null; planType: string | null };
 type RuntimeCheck = { ok: boolean; value?: { ready: boolean; runtime: string; profile: RuntimeProfile | null }; message?: string };
+type Confirmation = { title: string; description: string };
 const hasExtensionRuntime = () => typeof globalThis.chrome !== "undefined" && Boolean(globalThis.chrome.runtime?.id);
 const assetUrl = (path: string) => hasExtensionRuntime() ? chrome.runtime.getURL(path) : `/${path}`;
 const preview = new URLSearchParams(location.search);
@@ -35,15 +36,32 @@ const permissionCopy: Record<string, { title: string; description: string }> = {
 const approveLabels: Record<string, string> = { connect: "Connect", "permissions.request": "Allow", "workspace.select": "Choose", "threads.analyze": "Analyze", "tasks.start": "Start task", "tasks.send": "Send" };
 
 function Panel() {
+  const [confirmation, setConfirmation] = React.useState<Confirmation | null>(null);
   const pending = useQuery<Pending[]>({ queryKey: ["pending"], queryFn: () => send({ type: "ui.pending.list" }), refetchInterval: hasExtensionRuntime() ? 500 : false });
   const runtime = useQuery<RuntimeCheck>({ queryKey: ["runtime"], queryFn: () => send({ type: "ui.runtime.check" }), retry: false, refetchInterval: hasExtensionRuntime() ? 5000 : false });
   const resolve = useMutation({ mutationFn: ({ id, allowed, result }: { id: string; allowed: boolean; result?: unknown }) => send({ type: "ui.pending.resolve", id, allowed, result }), onSuccess: () => void pending.refetch() });
   const request = pending.data?.[0];
   const online = Boolean(runtime.data?.ok);
   const profile = online ? runtime.data?.value?.profile ?? null : null;
-  const handleResolve = (allowed: boolean, result?: unknown) => resolve.mutate({ id: request!.id, allowed, result }, { onSuccess: () => { if (document.body.dataset.mode === "popup") window.setTimeout(() => window.close(), 120); } });
+  const handleResolve = (allowed: boolean, result?: unknown) => {
+    const resolvedRequest = request!;
+    resolve.mutate({ id: resolvedRequest.id, allowed, result }, { onSuccess: () => {
+      if (!allowed) {
+        if (document.body.dataset.mode === "popup" && hasExtensionRuntime()) window.setTimeout(() => window.close(), 120);
+        return;
+      }
+      const site = resolvedRequest.origin === "Codex runtime" ? "Codex" : new URL(resolvedRequest.origin).hostname;
+      setConfirmation(resolvedRequest.method === "connect"
+        ? { title: "Connected", description: `${site} can now request the access you approved.` }
+        : { title: "Approved", description: "Your approval was securely sent to Codex." });
+      window.setTimeout(() => {
+        if (document.body.dataset.mode === "popup" && hasExtensionRuntime()) window.close();
+        else setConfirmation(null);
+      }, 1400);
+    } });
+  };
   if (runtime.isPending || pending.isPending) return <PanelSkeleton/>;
-  return <main className={styles.panel}><header><img className={styles.logo} src={assetUrl("icons/icon-32.png")}/><div><b>Codemask</b><span><i className={online ? styles.online : styles.offline}/>{online ? "Connected to Codex" : "Setup required"}</span></div><button aria-label="Open setup" onClick={() => void send({ type: "ui.onboarding.open" })}><DotsThree size={18} weight="bold"/></button></header><div className={styles.network}><span>LOCAL</span><b>{online ? "Codex connected" : "Codex runtime"}</b><i>{pending.data?.length ?? 0} pending</i></div>{profile && <Account profile={profile}/>} {!online ? <BridgeSetup request={request} onOpen={() => void send({ type: "ui.onboarding.open" })} onRetry={() => void runtime.refetch()} onCancel={request ? () => handleResolve(false) : undefined}/> : request ? <Request request={request} onResolve={handleResolve}/> : <Home/>}</main>;
+  return <main className={styles.panel}><header><img className={styles.logo} src={assetUrl("icons/icon-32.png")}/><div><b>Codemask</b><span><i className={online ? styles.online : styles.offline}/>{online ? "Connected to Codex" : "Setup required"}</span></div><button aria-label="Open setup" onClick={() => void send({ type: "ui.onboarding.open" })}><DotsThree size={18} weight="bold"/></button></header><div className={styles.network}><span>LOCAL</span><b>{online ? "Codex connected" : "Codex runtime"}</b><i>{confirmation ? 0 : pending.data?.length ?? 0} pending</i></div>{profile && <Account profile={profile}/>} {confirmation ? <ConfirmationView confirmation={confirmation}/> : !online ? <BridgeSetup request={request} onOpen={() => void send({ type: "ui.onboarding.open" })} onRetry={() => void runtime.refetch()} onCancel={request ? () => handleResolve(false) : undefined}/> : request ? <Request request={request} onResolve={handleResolve}/> : <Home/>}</main>;
 }
 
 function PanelSkeleton() {
@@ -68,6 +86,10 @@ function BridgeSetup({ request, onOpen, onRetry, onCancel }: { request?: Pending
 }
 
 function Home() { return <section className={styles.home}><div className={styles.heroIcon}><CheckCircle size={21} weight="fill"/></div><h1>Connected to Codex</h1><p>Codemask is listening for requests from sites you approve.</p><div className={styles.stat}><span>Security boundary</span><b>Extension owned</b></div><div className={styles.stat}><span>Data path</span><b>Local only</b></div><div className={styles.tip}><span className={styles.dot}/><div><b>Listening</b><span>No requests are waiting.</span></div></div></section>; }
+
+function ConfirmationView({ confirmation }: { confirmation: Confirmation }) {
+  return <section className={styles.confirmation} role="status" aria-live="polite"><div><CheckCircle size={24} weight="fill"/></div><h1>{confirmation.title}</h1><p>{confirmation.description}</p><small>Closing…</small></section>;
+}
 
 function Request({ request, onResolve }: { request: Pending; onResolve: (allowed: boolean, result?: unknown) => void }) {
   const [title, description] = labels[request.method] ?? ["Approve request?", "Review this request before continuing."];
