@@ -69,6 +69,7 @@ jobs:
           npm run package:bridge
           mkdir -p apps/docs/public/downloads
           cp release-assets/codemask-bridge.tgz apps/docs/public/downloads/codemask-bridge.tgz
+          npm pack ./packages/sdk --pack-destination apps/docs/public/downloads
       - name: Build ${{ matrix.app }}
         run: npm run build -w ${{ matrix.workspace }}
       - name: Deploy ${{ matrix.app }}

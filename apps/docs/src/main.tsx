@@ -15,15 +15,16 @@ cd my-integration
 npm install
 npm run dev`;
 
+const sdkInstall = `npm install https://cm.fldr.zip/downloads/window-codex-sdk-0.1.0.tgz`;
+
 const bridgeInstall = `npx --yes "https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.2"`;
 
-const requestExample = `const codex = await getCodexProvider()
-
-await codex.request({
-  method: 'connect',
+const addCodemaskExample = `await codex.request({
+  method: 'tasks.start',
   params: {
-    protocolVersion: '0.1',
-    scopes: ['threads:metadata']
+    workspaceId: workspace.id,
+    title: 'Add Codemask',
+    prompt: 'Add Codemask to my project'
   }
 })`;
 
@@ -53,7 +54,7 @@ function CodeBlock({ children }: { children: string }) {
   return <div className={styles.code}><button onClick={() => { void navigator.clipboard.writeText(children); setCopied(true); setTimeout(() => setCopied(false), 1200); }}>{copied ? "Copied" : "Copy"}</button><pre>{children}</pre></div>;
 }
 
-function Quickstart() { return <Article eyebrow="Five-minute quickstart" title="From zero to a Codex-powered page."><p>Codemask injects the typed <code>window.codex</code> provider. Install its local bridge with one developer-friendly command, then reload the unpacked extension.</p><CodeBlock>{bridgeInstall}</CodeBlock><h2>Scaffold an integration</h2><p>Generate the opinionated React starter directly from the public GitHub release. It includes provider discovery, a mock provider, task controls, Base UI, TanStack Query, CSS Modules, and Cloudflare configuration.</p><CodeBlock>{quickstart}</CodeBlock><h2>Make the first request</h2><CodeBlock>{requestExample}</CodeBlock><Callout>Without Codemask, the starter automatically uses a local mock so you can finish the interface first. No npm registry account is required.</Callout></Article>; }
+function Quickstart() { return <Article eyebrow="Five-minute quickstart" title="Add Codemask to your project."><p>Already have an app? Add the SDK directly from our hosted release, connect the provider, and let the user choose a workspace.</p><CodeBlock>{sdkInstall}</CodeBlock><h2>Start with one useful task</h2><p>Once connected, the meaningful part is one small request. Codemask shows the site, selected workspace, and exact prompt before anything runs.</p><CodeBlock>{addCodemaskExample}</CodeBlock><Callout>Your page can ask Codex to “Add Codemask to my project,” but it cannot choose the filesystem path or approve the task. The extension owns both decisions.</Callout><h2>Install the local bridge</h2><p>Run the bridge installer once on your Mac, then reload the unpacked Codemask extension. It connects Chrome directly to your authenticated Codex runtime.</p><CodeBlock>{bridgeInstall}</CodeBlock><h2>Starting from scratch?</h2><p>Generate the opinionated React starter with the complete connect and workspace-selection flow, plus a mock provider, Base UI, TanStack Query, CSS Modules, and Cloudflare configuration.</p><CodeBlock>{quickstart}</CodeBlock></Article>; }
 
 function Guides() { return <Article eyebrow="Guides" title="Small permissions. Clear outcomes."><div className={styles.guideList}>{[
   ["Connection", "Negotiate protocol 0.1 and ask only for capabilities your integration uses."],
