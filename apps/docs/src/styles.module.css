@@ -101,10 +101,17 @@ footer { display: flex; justify-content: space-between; padding: 28px clamp(24px
 
 .explorer { overflow: hidden; width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .explorerHeader { display: flex; align-items: center; gap: 12px; padding: 17px 20px; border-bottom: 1px solid var(--border); }
-.explorerHeader div { flex: 1; min-width: 0; }
 .explorerHeader b, .explorerHeader small { display: block; }
 .explorerHeader b { font-size: 14px; font-weight: 580; }
 .explorerHeader small { margin-top: 3px; color: var(--text-muted); font-size: 12px; }
+.connectionCopy { flex: 1; min-width: 150px; }
+.account { display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 245px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.accountAvatar { display: grid; flex: 0 0 auto; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font-size: 12px; font-weight: 650; }
+.accountCopy { min-width: 0; }
+.accountCopy b, .accountCopy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accountCopy b { font-size: 12px; }
+.accountCopy small { max-width: 142px; margin-top: 1px; font-size: 10px; }
+.accountPlan { flex: 0 0 auto; color: var(--text-muted); font-size: 9px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
 .connectedIcon { flex: 0 0 auto; color: var(--success); }
 .tabs { display: flex; gap: 6px; padding: 10px 16px 0; }
 .tabs button { padding: 10px 9px; border: 0; background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; }
@@ -153,6 +160,9 @@ footer { display: flex; justify-content: space-between; padding: 28px clamp(24px
   .article { padding: 44px 20px 72px; }
   .article article > h1 { margin-bottom: 30px; font-size: 35px; }
   .explorerHeader { align-items: flex-start; flex-wrap: wrap; padding: 20px; }
+  .account { order: 3; width: 100%; max-width: none; }
+  .accountCopy { flex: 1; }
+  .accountCopy small { max-width: none; }
   .explorerHeader .button { width: 100%; }
   .panel { padding: 24px 20px 28px; }
   .setupCard { padding: 26px 20px; }

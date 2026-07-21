@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { Link, Outlet, RouterProvider, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
@@ -69,13 +69,47 @@ const methods: Array<[string, string, string]> = [
 ];
 function Reference() { return <Article eyebrow="Protocol 0.1" title="A narrow, stable contract."><div className={styles.table}><div className={styles.tableHead}><span>Method</span><span>Permission</span><span>Outcome</span></div>{methods.map(row => <div key={row[0]}>{row.map(cell => <span key={cell}>{cell}</span>)}</div>)}</div><h2>Stable errors</h2><p><code>PROVIDER_UNAVAILABLE</code> · <code>PERMISSION_REQUIRED</code> · <code>USER_CANCELLED</code> · <code>RUNTIME_UNAVAILABLE</code> · <code>RUNTIME_ERROR</code></p></Article>; }
 
+function useCodexAccount(provider: CodexProvider | null) {
+  const info = useQuery({
+    queryKey: ["provider-info"],
+    enabled: Boolean(provider),
+    queryFn: () => provider!.request({ method: "provider.info", params: {} }),
+  });
+  const account = useMemo(() => {
+    const profile = info.data?.connected ? info.data.profile : null;
+    if (!profile) return null;
+    const address = profile.email ?? "API key account";
+    return {
+      address,
+      label: profile.email?.split("@")[0] ?? "Codex developer",
+      plan: profile.planType,
+      type: profile.type,
+    };
+  }, [info.data]);
+
+  useEffect(() => {
+    if (!provider) return;
+    const refresh = () => { void info.refetch(); };
+    provider.on("provider.connected", refresh);
+    provider.on("provider.disconnected", refresh);
+    return () => {
+      provider.removeListener("provider.connected", refresh);
+      provider.removeListener("provider.disconnected", refresh);
+    };
+  }, [provider, info.refetch]);
+
+  return { account, info };
+}
+
 function Explorer() {
   const [provider, setProvider] = useState<CodexProvider | null>(null);
   const [method, setMethod] = useState<CodexMethod>("provider.info");
   const [output, setOutput] = useState("No request sent yet.");
   const discovery = useQuery({ queryKey: ["provider"], queryFn: () => getCodexProvider({ timeoutMs: 800 }), retry: false });
-  const info = useQuery({ queryKey: ["provider-info"], enabled: Boolean(discovery.data), queryFn: async () => (discovery.data ?? await getCodexProvider()).request({ method: "provider.info", params: {} }) });
+  const activeProvider = provider ?? discovery.data ?? null;
+  const { account, info } = useCodexAccount(activeProvider);
   const connect = useMutation({ mutationFn: async () => { const value = discovery.data ?? await getCodexProvider(); setProvider(value); return value.request({ method: "connect", params: { protocolVersion: "0.1", scopes: ["threads:metadata"] } }); }, onSuccess: value => { setOutput(JSON.stringify(value, null, 2)); void info.refetch(); }, onError: error => setOutput(String(error)) });
+  const disconnect = useMutation({ mutationFn: async () => { if (!activeProvider) throw new Error("Codemask is unavailable"); return activeProvider.request({ method: "disconnect", params: {} }); }, onSuccess: value => { setOutput(JSON.stringify(value, null, 2)); void info.refetch(); }, onError: error => setOutput(String(error)) });
   const send = async () => { try { const active = provider ?? discovery.data ?? await getCodexProvider(); setProvider(active); const params = method === "threads.list" ? { limit: 5 } : {}; const value = await active.request({ method, params } as never); setOutput(JSON.stringify(value, null, 2)); } catch (error) { setOutput(String(error)); } };
   const connected = Boolean(info.data?.connected);
   return <Article eyebrow="Live provider explorer" title="See the boundary in action.">
@@ -84,7 +118,7 @@ function Explorer() {
       <div className={styles.setupCopy}><span>SETUP REQUIRED</span><h2>Add Codemask to this browser</h2><p>Install the extension and its local bridge, then return here to make your first <code>window.codex</code> request.</p></div>
       <ol className={styles.setupSteps}><li><span>1</span><div><b>Add the Codemask extension</b><small>Load the unpacked extension for the hackathon build.</small></div></li><li><span>2</span><div><b>Run the npx bridge installer</b><small>One command connects Chrome directly to your authenticated Codex runtime.</small></div></li><li><span>3</span><div><b>Retry detection</b><small>No Codex data is sent through this documentation site.</small></div></li></ol>
       <div className={styles.setupActions}><Link className={styles.setupPrimary} to="/quickstart">Open setup guide <ArrowRight size={17}/></Link><Button className={styles.setupSecondary} onClick={() => void discovery.refetch()}>Check again</Button></div>
-    </section> : <div className={styles.explorer}><div className={styles.explorerHeader}><CheckCircle size={22} className={styles.connectedIcon}/><div><b>{connected ? "Connected to Codex" : "Codemask detected"}</b><small>{connected ? "This origin has approved thread metadata access" : "Connect this site to your local Codex runtime"}</small></div><Button className={styles.button} disabled={connected || info.isLoading} onClick={() => connect.mutate()}>{connected ? "Connected" : connect.isPending ? "Waiting for approval…" : "Connect"}</Button></div><Tabs.Root defaultValue="request"><Tabs.List className={styles.tabs}><Tabs.Tab value="request">Request</Tabs.Tab><Tabs.Tab value="response">Response</Tabs.Tab></Tabs.List><Tabs.Panel value="request" className={styles.panel}><label>Method<select value={method} onChange={e => setMethod(e.target.value as CodexMethod)}>{methods.slice(0, 8).map(([name]) => <option key={name}>{name}</option>)}</select></label><Button className={styles.button} onClick={() => void send()}>Send request</Button></Tabs.Panel><Tabs.Panel value="response" className={styles.panel}><pre>{output}</pre></Tabs.Panel></Tabs.Root></div>}
+    </section> : <div className={styles.explorer}><div className={styles.explorerHeader}><CheckCircle size={22} className={styles.connectedIcon}/><div className={styles.connectionCopy}><b>{connected ? "Connected to Codex" : "Codemask detected"}</b><small>{connected ? "This origin has approved thread metadata access" : "Connect this site to your local Codex runtime"}</small></div>{connected && account ? <div className={styles.account} title={account.address}><span className={styles.accountAvatar}>{account.label.slice(0, 1).toUpperCase()}</span><span className={styles.accountCopy}><b>{account.label}</b><small>{account.address}</small></span>{account.plan ? <span className={styles.accountPlan}>{account.plan}</span> : null}</div> : null}<Button className={styles.button} disabled={info.isLoading || connect.isPending || disconnect.isPending} onClick={() => connected ? disconnect.mutate() : connect.mutate()}>{disconnect.isPending ? "Disconnecting…" : connected ? "Disconnect" : connect.isPending ? "Waiting for approval…" : "Connect"}</Button></div><Tabs.Root defaultValue="request"><Tabs.List className={styles.tabs}><Tabs.Tab value="request">Request</Tabs.Tab><Tabs.Tab value="response">Response</Tabs.Tab></Tabs.List><Tabs.Panel value="request" className={styles.panel}><label>Method<select value={method} onChange={e => setMethod(e.target.value as CodexMethod)}>{methods.slice(0, 8).map(([name]) => <option key={name}>{name}</option>)}</select></label><Button className={styles.button} onClick={() => void send()}>Send request</Button></Tabs.Panel><Tabs.Panel value="response" className={styles.panel}><pre>{output}</pre></Tabs.Panel></Tabs.Root></div>}
   </Article>;
 }
 
