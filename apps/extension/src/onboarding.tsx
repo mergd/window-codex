@@ -6,7 +6,7 @@ import "@window-codex/ui/tokens.css";
 import "./font.css";
 import styles from "./onboarding.module.css";
 
-const INSTALL_COMMAND = "npx --yes \"https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.5\"";
+const INSTALL_COMMAND = "npx --yes \"https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.6\"";
 const hasExtensionRuntime = () => typeof globalThis.chrome !== "undefined" && Boolean(globalThis.chrome.runtime?.id);
 const assetUrl = (path: string) => hasExtensionRuntime() ? chrome.runtime.getURL(path) : `/${path}`;
 const checkRuntime = () => hasExtensionRuntime() ? chrome.runtime.sendMessage({ type: "ui.runtime.check" }) : Promise.resolve({ ok: false, message: "Preview mode" });

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 
 export class AppServer extends EventEmitter {
@@ -11,7 +11,11 @@ export class AppServer extends EventEmitter {
 
   async start() {
     if (this.child) return;
-    this.child = spawn(this.codexBin, ["app-server", "--listen", "stdio://"], { stdio: ["pipe", "pipe", "pipe"] });
+    const mcpProbe = spawnSync(this.codexBin, ["mcp", "list", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    let mcpNames: string[] = [];
+    try { mcpNames = (JSON.parse(mcpProbe.stdout || "[]") as Array<{ name?: string }>).map(item => item.name).filter((name): name is string => Boolean(name && /^[A-Za-z0-9_-]+$/.test(name))); } catch { /* start with plugins disabled even if MCP discovery is unavailable */ }
+    const disabledMcps = mcpNames.flatMap(name => ["-c", `mcp_servers.${name}={command="/usr/bin/false",enabled=false}`]);
+    this.child = spawn(this.codexBin, ["app-server", "--disable", "plugins", "--disable", "apps", ...disabledMcps, "--listen", "stdio://"], { stdio: ["pipe", "pipe", "pipe"] });
     this.child.stderr.on("data", chunk => process.stderr.write(`[codex] ${chunk}`));
     this.child.on("exit", (code, signal) => { this.child = null; const failure = new Error(`codex app-server exited (${code ?? signal})`); this.pending.forEach(item => item.reject(failure)); this.pending.clear(); this.emit("exit", failure); });
     createInterface({ input: this.child.stdout }).on("line", line => { try { this.handle(JSON.parse(line)); } catch (error) { process.stderr.write(`[window.codex] invalid app-server frame: ${String(error)}\n`); } });
