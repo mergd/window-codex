@@ -4,10 +4,27 @@ const METHODS: CodexMethod[] = ["provider.info", "capabilities.list", "connect",
 const APPROVALS = new Set<CodexMethod>(["connect", "permissions.request", "workspace.select", "threads.analyze", "tasks.start", "tasks.send"]);
 type ApprovalResult = { allowed: boolean; result?: unknown };
 type Pending = { id: string; origin: string; method: string; params: unknown; tabId: number; resolve: (result: ApprovalResult) => void; createdAt: number };
+type SiteAction = { method: string; label: string; at: number };
+type SiteActivity = { origin: string; scopes: PermissionScope[]; actionCount: number; inputTokens: number; outputTokens: number; totalTokens: number; connectedAt: number; lastActiveAt: number; recentActions: SiteAction[] };
+type TaskUsage = { origin: string; inputTokens: number; outputTokens: number; totalTokens: number };
 const pending = new Map<string, Pending>();
 const nativeRequests = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 let nativePort: chrome.runtime.Port | null = null;
 let approvalWindowId: number | undefined;
+let activityWrite: Promise<void> = Promise.resolve();
+
+const ACTION_LABELS: Record<string, string> = {
+  connect: "Connected to Codex",
+  disconnect: "Disconnected",
+  "permissions.request": "Granted additional access",
+  "permissions.revoke": "Changed app access",
+  "workspace.select": "Selected a project",
+  "threads.list": "Viewed Codex history",
+  "threads.analyze": "Analyzed selected tasks",
+  "tasks.start": "Started a Codex task",
+  "tasks.send": "Sent a task follow-up",
+  "tasks.cancel": "Cancelled a Codex task",
+};
 
 async function openApprovalWindow() {
   if (approvalWindowId !== undefined) {
@@ -42,6 +59,48 @@ async function storeGrants(origin: string, grants: Grant[]) { const stored = awa
 function hasScope(grants: Grant[], scope: PermissionScope) { return grants.some(grant => grant.scopes.includes(scope)); }
 function requiredScope(method: CodexMethod): PermissionScope | null { if (method === "threads.list") return "threads:metadata"; if (method === "threads.analyze") return "threads:analyze"; if (method === "tasks.start") return "tasks:create"; if (["tasks.get", "tasks.send", "tasks.cancel"].includes(method)) return "tasks:control"; return null; }
 
+function queueActivity(work: () => Promise<void>) { activityWrite = activityWrite.then(work, work); return activityWrite; }
+function recordActivity(origin: string, method: string, params: any) {
+  const label = ACTION_LABELS[method]; if (!label) return Promise.resolve();
+  return queueActivity(async () => {
+    const stored = await chrome.storage.local.get("siteActivity");
+    const sites = (stored.siteActivity ?? {}) as Record<string, SiteActivity>;
+    const now = Math.floor(Date.now() / 1000);
+    const current = sites[origin] ?? { origin, scopes: [], actionCount: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, connectedAt: now, lastActiveAt: now, recentActions: [] };
+    const requestedScopes = Array.isArray(params?.scopes) ? params.scopes as PermissionScope[] : [];
+    sites[origin] = { ...current, scopes: [...new Set([...current.scopes, ...requestedScopes])], actionCount: current.actionCount + 1, lastActiveAt: now, recentActions: [{ method, label, at: now }, ...current.recentActions].slice(0, 8) };
+    await chrome.storage.local.set({ siteActivity: sites });
+  });
+}
+
+function recordUsage(payload: TaskUsage & { taskId: string }) {
+  return queueActivity(async () => {
+    const stored = await chrome.storage.local.get(["siteActivity", "taskUsage"]);
+    const sites = (stored.siteActivity ?? {}) as Record<string, SiteActivity>;
+    const tasks = (stored.taskUsage ?? {}) as Record<string, TaskUsage>;
+    const previous = tasks[payload.taskId] ?? { origin: payload.origin, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const now = Math.floor(Date.now() / 1000);
+    const current = sites[payload.origin] ?? { origin: payload.origin, scopes: [], actionCount: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, connectedAt: now, lastActiveAt: now, recentActions: [] };
+    sites[payload.origin] = { ...current, inputTokens: current.inputTokens + Math.max(0, payload.inputTokens - previous.inputTokens), outputTokens: current.outputTokens + Math.max(0, payload.outputTokens - previous.outputTokens), totalTokens: current.totalTokens + Math.max(0, payload.totalTokens - previous.totalTokens), lastActiveAt: now };
+    tasks[payload.taskId] = { origin: payload.origin, inputTokens: payload.inputTokens, outputTokens: payload.outputTokens, totalTokens: payload.totalTokens };
+    await chrome.storage.local.set({ siteActivity: sites, taskUsage: tasks });
+  });
+}
+
+async function listActivity() {
+  await activityWrite;
+  const stored = await chrome.storage.local.get(["siteActivity", "grants"]);
+  const sites = { ...((stored.siteActivity ?? {}) as Record<string, SiteActivity>) };
+  const grants = (stored.grants ?? {}) as Record<string, Grant[]>;
+  for (const [origin, originGrants] of Object.entries(grants)) {
+    if (!originGrants.length) continue;
+    const createdAt = Math.min(...originGrants.map(grant => grant.createdAt));
+    const current = sites[origin] ?? { origin, scopes: [], actionCount: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, connectedAt: createdAt, lastActiveAt: createdAt, recentActions: [] };
+    sites[origin] = { ...current, scopes: [...new Set([...current.scopes, ...originGrants.flatMap(grant => grant.scopes)])] };
+  }
+  return Object.values(sites).map(site => ({ ...site, connected: Boolean(grants[site.origin]?.length) })).sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+}
+
 async function approve(origin: string, method: string, params: unknown, tabId: number) {
   const id = crypto.randomUUID();
   const response = await new Promise<ApprovalResult>(resolve => { pending.set(id, { id, origin, method, params, tabId, resolve, createdAt: Date.now() }); void openApprovalWindow(); });
@@ -54,7 +113,7 @@ function getNativePort() {
   if (nativePort) return nativePort;
   nativePort = chrome.runtime.connectNative("com.window.codex");
   nativePort.onMessage.addListener(message => {
-    if (message.type === "event") { void broadcast(message.event, message.payload); return; }
+    if (message.type === "event") { if (message.event === "internal.usage") void recordUsage(message.payload); else void broadcast(message.event, message.payload); return; }
     if (message.type === "approval") {
       void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(tabs => {
         const tabId = tabs[0]?.id;
@@ -106,8 +165,9 @@ async function handleProvider(message: { method: CodexMethod; params: any }, sen
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "provider.request") { handleProvider(message, sender).then(sendResponse, reason => sendResponse({ __error: { code: reason.code ?? "RUNTIME_ERROR", message: reason.message ?? String(reason), data: reason.data } })); return true; }
+  if (message?.type === "provider.request") { handleProvider(message, sender).then(async value => { const origin = exactOrigin(sender); await recordActivity(origin, message.method, message.params); sendResponse(value); }, reason => sendResponse({ __error: { code: reason.code ?? "RUNTIME_ERROR", message: reason.message ?? String(reason), data: reason.data } })); return true; }
   if (message?.type === "ui.pending.list") { sendResponse([...pending.values()].map(({ resolve, ...item }) => item)); return false; }
+  if (message?.type === "ui.activity.list") { listActivity().then(sendResponse); return true; }
   if (message?.type === "ui.pending.resolve") { pending.get(message.id)?.resolve({ allowed: Boolean(message.allowed), result: message.result }); sendResponse({ ok: true }); return false; }
   if (message?.type === "ui.runtime.check") { callNative("chrome-extension://self", "provider.info", {}).then(value => sendResponse({ ok: true, value }), reason => sendResponse({ ok: false, message: reason.message })); return true; }
   if (message?.type === "ui.onboarding.open") { void chrome.tabs.create({ url: chrome.runtime.getURL("onboarding.html") }); sendResponse({ ok: true }); return false; }

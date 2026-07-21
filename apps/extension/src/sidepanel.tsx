@@ -12,12 +12,22 @@ type Pending = { id: string; origin: string; method: string; params: Record<stri
 type RuntimeProfile = { type: "chatgpt" | "apiKey"; email: string | null; planType: string | null };
 type RuntimeCheck = { ok: boolean; value?: { ready: boolean; runtime: string; profile: RuntimeProfile | null }; message?: string };
 type Confirmation = { title: string; description: string };
+type SiteActivity = { origin: string; connected: boolean; scopes: string[]; actionCount: number; inputTokens: number; outputTokens: number; totalTokens: number; connectedAt: number; lastActiveAt: number; recentActions: Array<{ method: string; label: string; at: number }> };
 const hasExtensionRuntime = () => typeof globalThis.chrome !== "undefined" && Boolean(globalThis.chrome.runtime?.id);
-const assetUrl = (path: string) => hasExtensionRuntime() ? chrome.runtime.getURL(path) : `/${path}`;
 const preview = new URLSearchParams(location.search);
 const demoPending: Pending[] = preview.has("home") ? [] : [{ id: "preview", origin: "https://cm.fldr.zip", method: "connect", params: { scopes: ["threads:metadata"] }, createdAt: Date.now() }];
 const demoRuntime: RuntimeCheck = { ok: true, value: { ready: true, runtime: "codex app-server", profile: { type: "chatgpt", email: "william@example.com", planType: "pro" } } };
-const send = (message: unknown) => hasExtensionRuntime() ? chrome.runtime.sendMessage(message) : preview.has("loading") ? new Promise(() => undefined) : Promise.resolve((message as { type?: string }).type === "ui.pending.list" ? demoPending : (message as { type?: string }).type === "ui.runtime.check" ? demoRuntime : { ok: true });
+const now = Math.floor(Date.now() / 1000);
+const demoActivity: SiteActivity[] = [
+  { origin: "https://reflex.cm.fldr.zip", connected: true, scopes: ["threads:metadata", "threads:analyze", "tasks:create"], actionCount: 7, inputTokens: 38240, outputTokens: 6310, totalTokens: 44550, connectedAt: now - 86400, lastActiveAt: now - 180, recentActions: [{ method: "threads.analyze", label: "Analyzed selected tasks", at: now - 180 }] },
+  { origin: "https://cm.fldr.zip", connected: true, scopes: ["threads:metadata"], actionCount: 3, inputTokens: 0, outputTokens: 0, totalTokens: 0, connectedAt: now - 172800, lastActiveAt: now - 7200, recentActions: [{ method: "threads.list", label: "Viewed Codex history", at: now - 7200 }] },
+];
+const send = (message: unknown): Promise<any> => {
+  if (hasExtensionRuntime()) return chrome.runtime.sendMessage(message);
+  if (preview.has("loading")) return new Promise(() => undefined);
+  const type = (message as { type?: string }).type;
+  return Promise.resolve(type === "ui.pending.list" ? demoPending : type === "ui.runtime.check" ? demoRuntime : type === "ui.activity.list" ? demoActivity : { ok: true });
+};
 const labels: Record<string, [string, string]> = {
   connect: ["Connect this site?", "Choose which Codex capabilities this origin can request."],
   "permissions.request": ["Grant additional access?", "Review the exact scope and how long it will last."],
@@ -30,8 +40,10 @@ const labels: Record<string, [string, string]> = {
 const permissionCopy: Record<string, { title: string; description: string }> = {
   "threads:metadata": { title: "View Codex activity", description: "See task titles, dates, and workspace labels. Message content stays private." },
   "threads:analyze": { title: "Analyze selected tasks", description: "Let Codex review selected tasks once and return themes without transcript excerpts." },
+  "workspace:select": { title: "Choose a project", description: "Select a workspace without exposing its filesystem path to the site." },
   "tasks:create": { title: "Start Codex tasks", description: "Submit a task only after you confirm its workspace and exact prompt." },
   "tasks:control": { title: "Manage started tasks", description: "View progress, send confirmed follow-ups, or cancel tasks started by this site." },
+  "events:subscribe": { title: "View task progress", description: "Receive sanitized status updates for tasks started by this site." },
 };
 const approveLabels: Record<string, string> = { connect: "Connect", "permissions.request": "Allow", "workspace.select": "Choose", "threads.analyze": "Analyze", "tasks.start": "Start task", "tasks.send": "Send" };
 
@@ -39,6 +51,7 @@ function Panel() {
   const [confirmation, setConfirmation] = React.useState<Confirmation | null>(null);
   const pending = useQuery<Pending[]>({ queryKey: ["pending"], queryFn: () => send({ type: "ui.pending.list" }), refetchInterval: hasExtensionRuntime() ? 500 : false });
   const runtime = useQuery<RuntimeCheck>({ queryKey: ["runtime"], queryFn: () => send({ type: "ui.runtime.check" }), retry: false, refetchInterval: hasExtensionRuntime() ? 5000 : false });
+  const activity = useQuery<SiteActivity[]>({ queryKey: ["activity"], queryFn: () => send({ type: "ui.activity.list" }), refetchInterval: hasExtensionRuntime() ? 2000 : false });
   const resolve = useMutation({ mutationFn: ({ id, allowed, result }: { id: string; allowed: boolean; result?: unknown }) => send({ type: "ui.pending.resolve", id, allowed, result }), onSuccess: () => void pending.refetch() });
   const request = pending.data?.[0];
   const online = Boolean(runtime.data?.ok);
@@ -60,12 +73,12 @@ function Panel() {
       }, 1400);
     } });
   };
-  if (runtime.isPending || pending.isPending) return <PanelSkeleton/>;
-  return <main className={styles.panel}><header><img className={styles.logo} src={assetUrl("icons/icon-32.png")}/><div><b>Codemask</b><span><i className={online ? styles.online : styles.offline}/>{online ? "Connected to Codex" : "Setup required"}</span></div><button aria-label="Open setup" onClick={() => void send({ type: "ui.onboarding.open" })}><DotsThree size={18} weight="bold"/></button></header><div className={styles.network}><span>LOCAL</span><b>{online ? "Codex connected" : "Codex runtime"}</b><i>{confirmation ? 0 : pending.data?.length ?? 0} pending</i></div>{profile && <Account profile={profile}/>} {confirmation ? <ConfirmationView confirmation={confirmation}/> : !online ? <BridgeSetup request={request} onOpen={() => void send({ type: "ui.onboarding.open" })} onRetry={() => void runtime.refetch()} onCancel={request ? () => handleResolve(false) : undefined}/> : request ? <Request request={request} onResolve={handleResolve}/> : <Home/>}</main>;
+  if (runtime.isPending || pending.isPending || activity.isPending) return <PanelSkeleton/>;
+  return <main className={styles.panel}>{confirmation ? <ConfirmationView confirmation={confirmation}/> : !online ? <BridgeSetup request={request} onOpen={() => void send({ type: "ui.onboarding.open" })} onRetry={() => void runtime.refetch()} onCancel={request ? () => handleResolve(false) : undefined}/> : request ? <Request request={request} onResolve={handleResolve}/> : <Home activities={activity.data ?? []} profile={profile} onManage={() => void send({ type: "ui.onboarding.open" })}/>}</main>;
 }
 
 function PanelSkeleton() {
-  return <main className={`${styles.panel} ${styles.loading}`} aria-busy="true" aria-label="Loading Codemask"><header><img className={styles.logo} src={assetUrl("icons/icon-32.png")}/><div><b>Codemask</b><span className={styles.skeletonShort}/></div></header><div className={styles.network}><i className={styles.skeletonPill}/><i className={styles.skeletonMedium}/></div><section><i className={styles.skeletonAvatar}/><div><i className={styles.skeletonMedium}/><i className={styles.skeletonLong}/></div></section><article><i className={styles.skeletonKicker}/><i className={styles.skeletonTitle}/><i className={styles.skeletonLong}/><i className={styles.skeletonCard}/></article><div className={styles.skeletonActions}><i/><i/></div></main>;
+  return <main className={`${styles.panel} ${styles.loading}`} aria-busy="true" aria-label="Loading Codemask"><article><i className={styles.skeletonKicker}/><i className={styles.skeletonTitle}/><i className={styles.skeletonLong}/><i className={styles.skeletonCard}/><i className={styles.skeletonCard}/></article></main>;
 }
 
 function profileName(profile: RuntimeProfile) {
@@ -85,7 +98,15 @@ function BridgeSetup({ request, onOpen, onRetry, onCancel }: { request?: Pending
   return <section className={styles.bridgeSetup}><div className={styles.setupIcon}><WarningCircle size={24}/></div><small>ONE-TIME SETUP</small><h1>Finish setting up Codemask</h1><p>{site ? `${site} is waiting to connect, but the local bridge is not ready yet.` : "Install the local macOS bridge to let approved websites talk to Codex on this computer."}</p><div className={styles.setupList}><div><span>1</span><p><b>Codemask installed</b><small>This browser can receive permission requests.</small></p><CheckCircle size={18} weight="fill"/></div><div><span>2</span><p><b>Install the local bridge</b><small>Connect directly to your authenticated Codex runtime.</small></p></div></div><Button className={styles.setupPrimary} onClick={onOpen}>Set up local bridge <ArrowRight size={17}/></Button><Button className={styles.setupSecondary} onClick={onRetry}>I installed it — check again</Button>{onCancel && <button className={styles.cancelSetup} onClick={onCancel}>Cancel this request</button>}<p className={styles.localNote}>Your Codex data stays on this Mac.</p></section>;
 }
 
-function Home() { return <section className={styles.home}><div className={styles.heroIcon}><CheckCircle size={21} weight="fill"/></div><h1>Connected to Codex</h1><p>Codemask is listening for requests from sites you approve.</p><div className={styles.stat}><span>Security boundary</span><b>Extension owned</b></div><div className={styles.stat}><span>Data path</span><b>Local only</b></div><div className={styles.tip}><span className={styles.dot}/><div><b>Listening</b><span>No requests are waiting.</span></div></div></section>; }
+function compactNumber(value: number) { return value ? new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value) : "—"; }
+function relativeTime(value: number) { const seconds = Math.max(0, Math.floor(Date.now() / 1000) - value); if (seconds < 60) return "Just now"; if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`; if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`; return `${Math.floor(seconds / 86400)}d ago`; }
+function siteName(origin: string) { try { return new URL(origin).hostname; } catch { return origin; } }
+
+function Home({ activities, profile, onManage }: { activities: SiteActivity[]; profile: RuntimeProfile | null; onManage: () => void }) {
+  const actions = activities.reduce((sum, site) => sum + site.actionCount, 0);
+  const tokens = activities.reduce((sum, site) => sum + site.totalTokens, 0);
+  return <section className={styles.home}><div className={styles.homeHeader}><div><small>CODEX ACCESS</small><h1>Connected apps</h1><p>See which sites have used Codex through this browser.</p></div><button aria-label="Manage Codemask" onClick={onManage}><DotsThree size={18} weight="bold"/></button></div>{profile && <Account profile={profile}/>}<div className={styles.metrics}><div><b>{activities.filter(site => site.connected).length}</b><span>connected</span></div><div><b>{actions}</b><span>actions</span></div><div><b>{compactNumber(tokens)}</b><span>tokens</span></div></div><div className={styles.sectionTitle}><h2>Previously connected</h2><span>{activities.length} apps</span></div>{activities.length ? <div className={styles.siteList}>{activities.map(site => <article className={styles.site} key={site.origin}><div className={styles.siteHead}><span>{siteName(site.origin).slice(0, 1).toUpperCase()}</span><div><b>{siteName(site.origin)}</b><small>{site.connected ? "Connected" : "Previously connected"}</small></div><em className={site.connected ? styles.connected : styles.disconnected}>{site.connected ? "Active" : "Past"}</em></div><div className={styles.siteStats}><span><b>{site.actionCount}</b> actions</span><span><b>{compactNumber(site.totalTokens)}</b> tokens</span></div><div className={styles.latest}><i/><div><b>{site.recentActions[0]?.label ?? "Connected to Codex"}</b><small>{relativeTime(site.recentActions[0]?.at ?? site.lastActiveAt)}</small></div></div><p>{site.scopes.map(scope => permissionCopy[scope]?.title ?? scope).join(" · ") || "No active permissions"}</p></article>)}</div> : <div className={styles.empty}><b>No connected apps yet</b><p>Approved sites and their Codex activity will appear here.</p></div>}<p className={styles.usageNote}>Token totals include only tasks started by these apps and stay stored in this extension.</p></section>;
+}
 
 function ConfirmationView({ confirmation }: { confirmation: Confirmation }) {
   return <section className={styles.confirmation} role="status" aria-live="polite"><div><CheckCircle size={24} weight="fill"/></div><h1>{confirmation.title}</h1><p>{confirmation.description}</p><small>Closing…</small></section>;

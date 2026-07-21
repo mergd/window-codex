@@ -15,6 +15,7 @@ const decoder = new NativeMessageDecoder();
 const aliases = new Map<string, string>();
 const workspaces = new Map<string, string>();
 const tasks = new Map<string, Task>();
+const usageOwners = new Map<string, { id: string; origin: string }>();
 const turnWaiters = new Map<string, { chunks: string[]; resolve: (text: string) => void; reject: (error: Error) => void }>();
 
 function write(value: unknown) { process.stdout.write(encodeNativeMessage(value)); }
@@ -35,6 +36,11 @@ app.on("notification", (message: any) => {
   if (message.method === "item/agentMessage/delta" && waiter && typeof params.delta === "string") waiter.chunks.push(params.delta);
   if (message.method === "turn/completed" && waiter) { turnWaiters.delete(threadId); waiter.resolve(waiter.chunks.join("")); }
   const task = threadId ? findTaskByRuntime(threadId) : undefined;
+  if (message.method === "thread/tokenUsage/updated") {
+    const total = params.tokenUsage?.total;
+    const owner = task ? { id: task.id, origin: task.origin } : usageOwners.get(threadId);
+    if (total && owner) event("internal.usage", { taskId: owner.id, origin: owner.origin, inputTokens: total.inputTokens ?? 0, outputTokens: total.outputTokens ?? 0, totalTokens: total.totalTokens ?? 0 });
+  }
   if (!task) return;
   if (message.method === "turn/started") { task.status = "running"; task.updatedAt = Date.now() / 1000; event("task.started", { task: snapshot(task) }); }
   if (message.method === "item/agentMessage/delta" && typeof params.delta === "string") { task.sequence += 1; task.lastMessage = `${task.lastMessage ?? ""}${params.delta}`.slice(-4000); task.updatedAt = Date.now() / 1000; event("task.event", { taskId: task.id, sequence: task.sequence, kind: "agentMessage", text: params.delta }); }
@@ -96,6 +102,7 @@ async function analyze(origin: string, threadIds: string[]) {
   for (const [index, runtimeId] of runtimeIds.entries()) { const response = await app.request("thread/read", { threadId: runtimeId, includeTurns: true }); let encoded = JSON.stringify(response.thread); if (encoded.length > 80_000) { encoded = encoded.slice(-80_000); truncatedThreads += 1; } if (total + encoded.length > 300_000) { truncatedThreads += 1; continue; } total += encoded.length; histories.push({ id: threadIds[index], content: encoded }); }
   const cwd = await mkdtemp(`${tmpdir()}/window-codex-analysis-`);
   const thread = await app.request("thread/start", { cwd, ephemeral: true, approvalPolicy: "never", sandbox: "read-only", serviceName: "window_codex_analysis", developerInstructions: "Analyze only the supplied JSON. Do not use tools or inspect the filesystem. Return only JSON matching the requested schema." });
+  usageOwners.set(thread.thread.id, { id: `analysis:${randomUUID()}`, origin });
   const outputSchema = reflectionSchema();
   const prompt = `Analyze these selected Codex thread histories. Identify recurring themes, friction, and actionable improvements. Never quote transcript text. Use only opaque thread IDs in evidence.\n\n${JSON.stringify(histories)}`;
   const completion = waitForTurn(thread.thread.id);

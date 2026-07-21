@@ -17,7 +17,7 @@ npm run dev`;
 
 const sdkInstall = `npm install https://cm.fldr.zip/downloads/window-codex-sdk-0.1.0.tgz`;
 
-const bridgeInstall = `npx --yes "https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.2"`;
+const bridgeInstall = `npx --yes "https://cm.fldr.zip/downloads/codemask-bridge.tgz?bridge=0.1.3"`;
 
 const addCodemaskExample = `await codex.request({
   method: 'tasks.start',
