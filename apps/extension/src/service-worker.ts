@@ -159,7 +159,7 @@ async function handleProvider(message: { method: CodexMethod; params: any }, sen
   if (scope && !hasScope(current, scope) && !APPROVALS.has(message.method)) throw error("PERMISSION_REQUIRED", `${scope} is required`);
   if (APPROVALS.has(message.method)) await approve(origin, message.method, message.params, tabId);
   if (message.method === "threads.analyze") {
-    if (!Array.isArray(message.params.threadIds) || message.params.threadIds.length < 1 || message.params.threadIds.length > 10) throw error("INVALID_SELECTOR", "Select between one and ten threads");
+    if (!Array.isArray(message.params.threadIds) || message.params.threadIds.length < 1) throw error("INVALID_SELECTOR", "Select at least one thread");
   }
   return callNative(origin, message.method, message.params);
 }

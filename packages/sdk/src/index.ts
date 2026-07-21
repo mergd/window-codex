@@ -61,7 +61,7 @@ export interface CodexMethodParams {
   "permissions.request": { scopes: PermissionScope[]; persistence: GrantPersistence; selector?: { threadIds?: string[] } };
   "permissions.revoke": { grantId?: string };
   "workspace.select": { suggestedLabel?: string };
-  "threads.list": { cursor?: string; limit?: number };
+  "threads.list": { cursor?: string; limit?: number; archived?: boolean; includeTurnCounts?: boolean };
   "threads.analyze": { recipe: "reflection.v1"; threadIds: string[] };
   "tasks.start": { workspaceId: string; prompt: string; title?: string };
   "tasks.get": { taskId: string };

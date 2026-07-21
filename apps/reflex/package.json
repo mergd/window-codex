@@ -10,6 +10,7 @@
     "@tanstack/react-router": "^1.0.0",
     "@window-codex/sdk": "0.1.0",
     "@window-codex/ui": "0.1.0",
+    "date-fns": "^4.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

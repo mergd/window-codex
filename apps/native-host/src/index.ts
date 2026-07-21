@@ -27,6 +27,11 @@ function event(event: string, payload: unknown) { write({ type: "event", event, 
 
 function input(text: string) { return [{ type: "text", text, text_elements: [] }]; }
 function findTaskByRuntime(threadId: string) { return [...tasks.values()].find(task => task.runtimeThreadId === threadId); }
+async function mapConcurrent<T, R>(items: T[], concurrency: number, worker: (item: T, index: number) => Promise<R>) {
+  const results = new Array<R>(items.length); let next = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => { while (next < items.length) { const index = next++; results[index] = await worker(items[index], index); } }));
+  return results;
+}
 
 app.on("notification", (message: any) => {
   const params = message.params ?? {};
@@ -72,8 +77,10 @@ async function handle(message: HostMessage) {
     }
     if (method === "workspace.select") { const workspaceId = alias(origin, "workspace", defaultWorkspace); workspaces.set(`${origin}:${workspaceId}`, defaultWorkspace); write({ id, result: { id: workspaceId, label: basename(defaultWorkspace) } }); return; }
     if (method === "threads.list") {
-      const response = await app.request("thread/list", { cursor: params.cursor ?? null, limit: params.limit ?? 20, sortKey: "updated_at" });
-      const data = (response.data ?? []).map((thread: any) => ({ id: alias(origin, "thread", thread.id), title: thread.name || thread.preview || "Untitled Codex task", createdAt: thread.createdAt ?? 0, updatedAt: thread.updatedAt ?? thread.createdAt ?? 0, turnCount: Array.isArray(thread.turns) ? thread.turns.length : 0, workspaceLabel: thread.cwd ? basename(thread.cwd) : null }));
+      const response = await app.request("thread/list", { cursor: params.cursor ?? null, limit: params.limit ?? 20, archived: params.archived ?? false, sortKey: "updated_at" });
+      const threads = response.data ?? [];
+      const turnCounts = params.includeTurnCounts ? await mapConcurrent(threads, 8, async (thread: any) => { const detail = await app.request("thread/read", { threadId: thread.id, includeTurns: true }); return Array.isArray(detail.thread?.turns) ? detail.thread.turns.length : 0; }) : threads.map((thread: any) => Array.isArray(thread.turns) ? thread.turns.length : 0);
+      const data = threads.map((thread: any, index: number) => ({ id: alias(origin, "thread", thread.id), title: thread.name || thread.preview || "Untitled Codex task", createdAt: thread.createdAt ?? 0, updatedAt: thread.updatedAt ?? thread.createdAt ?? 0, turnCount: turnCounts[index], workspaceLabel: thread.cwd ? basename(thread.cwd) : null }));
       write({ id, result: { data, nextCursor: response.nextCursor ?? null } }); return;
     }
     if (method === "threads.analyze") { write({ id, result: await analyze(origin, params.threadIds) }); return; }
@@ -98,19 +105,31 @@ async function startTask(origin: string, params: any) {
 async function analyze(origin: string, threadIds: string[]) {
   const runtimeIds = threadIds.map(value => resolveAlias(origin, "thread", value)).filter(Boolean) as string[];
   if (runtimeIds.length !== threadIds.length) throw Object.assign(new Error("The thread selection is invalid or expired"), { code: "INVALID_SELECTOR" });
-  const histories: Array<{ id: string; content: string }> = []; let truncatedThreads = 0; let total = 0;
-  for (const [index, runtimeId] of runtimeIds.entries()) { const response = await app.request("thread/read", { threadId: runtimeId, includeTurns: true }); let encoded = JSON.stringify(response.thread); if (encoded.length > 80_000) { encoded = encoded.slice(-80_000); truncatedThreads += 1; } if (total + encoded.length > 300_000) { truncatedThreads += 1; continue; } total += encoded.length; histories.push({ id: threadIds[index], content: encoded }); }
+  let truncatedThreads = 0;
+  const histories = await mapConcurrent(runtimeIds, 8, async (runtimeId, index) => {
+    const response = await app.request("thread/read", { threadId: runtimeId, includeTurns: true });
+    let encoded = JSON.stringify(response.thread); if (encoded.length > 32_000) { encoded = encoded.slice(-32_000); truncatedThreads += 1; }
+    return { id: threadIds[index], content: encoded, turnCount: Array.isArray(response.thread?.turns) ? response.thread.turns.length : 0, createdAt: response.thread?.createdAt ?? 0, updatedAt: response.thread?.updatedAt ?? response.thread?.createdAt ?? 0 };
+  });
+  const batches = Array.from({ length: Math.ceil(histories.length / 4) }, (_, index) => histories.slice(index * 4, index * 4 + 4));
+  const summaries = await mapConcurrent(batches, 2, async (batch, index) => runReflectionPass(origin, `Analyze batch ${index + 1} of ${batches.length} from a complete Codex history. Identify 4-8 specific themes, recurring friction, and actionable improvements. Never quote transcript text. Use only the supplied opaque thread IDs as evidence.\n\n${JSON.stringify(batch.map(({ id, content }) => ({ id, content })))}`));
+  const parsed = summaries.length === 1 ? summaries[0] : await runReflectionPass(origin, `Synthesize these batch-level reflections into one detailed account-wide reflection. Consolidate duplicates, preserve important minority patterns, and return 5-10 themes, 5-10 friction points, and 5-10 concrete suggestions. Never invent or quote transcript text. Evidence must use only opaque thread IDs present in the summaries.\n\n${JSON.stringify(summaries)}`);
+  const timestamps = histories.flatMap(history => [history.createdAt, history.updatedAt]).filter(Boolean);
+  const activeDays = new Set(histories.filter(history => history.updatedAt).map(history => new Date(history.updatedAt * 1000).toISOString().slice(0, 10))).size;
+  parsed.coverage = { ...(parsed.coverage ?? {}), selectedThreads: threadIds.length, analyzedThreads: histories.length, truncatedThreads, from: timestamps.length ? new Date(Math.min(...timestamps) * 1000).toISOString() : null, to: timestamps.length ? new Date(Math.max(...timestamps) * 1000).toISOString() : null };
+  parsed.activity = { threadCount: histories.length, turnCount: histories.reduce((sum, history) => sum + history.turnCount, 0), activeDays };
+  return parsed;
+}
+
+async function runReflectionPass(origin: string, prompt: string) {
   const cwd = await mkdtemp(`${tmpdir()}/window-codex-analysis-`);
   const thread = await app.request("thread/start", { cwd, ephemeral: true, approvalPolicy: "never", sandbox: "read-only", serviceName: "window_codex_analysis", developerInstructions: "Analyze only the supplied JSON. Do not use tools or inspect the filesystem. Return only JSON matching the requested schema." });
   usageOwners.set(thread.thread.id, { id: `analysis:${randomUUID()}`, origin });
   const outputSchema = reflectionSchema();
-  const prompt = `Analyze these selected Codex thread histories. Identify recurring themes, friction, and actionable improvements. Never quote transcript text. Use only opaque thread IDs in evidence.\n\n${JSON.stringify(histories)}`;
   const completion = waitForTurn(thread.thread.id);
   await app.request("turn/start", { threadId: thread.thread.id, input: input(prompt), outputSchema });
   const text = await completion;
-  const parsed = JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ""));
-  parsed.coverage = { ...(parsed.coverage ?? {}), selectedThreads: threadIds.length, analyzedThreads: histories.length, truncatedThreads };
-  return parsed;
+  return JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ""));
 }
 
 function reflectionSchema() {
