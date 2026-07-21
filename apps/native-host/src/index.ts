@@ -55,7 +55,15 @@ async function handle(message: HostMessage) {
   if ("type" in message) { app.respond(Number(message.id), message.result ?? { decision: message.decision ?? "decline" }); return; }
   const { id, origin, method, params } = message;
   try {
-    if (method === "provider.info") { write({ id, result: { ready: true, runtime: "codex app-server" } }); return; }
+    if (method === "provider.info") {
+      const account = await app.request("account/read", { refreshToken: false }).catch(() => null);
+      const profile = account?.account?.type === "chatgpt"
+        ? { type: "chatgpt", email: account.account.email, planType: account.account.planType }
+        : account?.account?.type === "apiKey"
+          ? { type: "apiKey", email: null, planType: null }
+          : null;
+      write({ id, result: { ready: true, runtime: "codex app-server", profile } }); return;
+    }
     if (method === "workspace.select") { const workspaceId = alias(origin, "workspace", defaultWorkspace); workspaces.set(`${origin}:${workspaceId}`, defaultWorkspace); write({ id, result: { id: workspaceId, label: basename(defaultWorkspace) } }); return; }
     if (method === "threads.list") {
       const response = await app.request("thread/list", { cursor: params.cursor ?? null, limit: params.limit ?? 20, sortKey: "updated_at" });

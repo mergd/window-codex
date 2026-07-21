@@ -17,6 +17,13 @@
 .network span { padding: 3px 5px; border: 1px solid #514bbf; border-radius: 4px; color: #8e88ff; font-weight: 750; letter-spacing: .08em; }
 .network b { color: #c8cbd1; font-weight: 550; }
 .network i { margin-left: auto; color: #707784; font-style: normal; }
+.account { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 58px; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); background: var(--surface); }
+.avatar { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; }
+.account div { min-width: 0; }
+.account b, .account small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account b { color: var(--text); font-size: 12px; font-weight: 600; }
+.account small { margin-top: 2px; color: var(--text-muted); font-size: 10px; }
+.account em { padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 8px; font-style: normal; letter-spacing: .07em; text-transform: uppercase; }
 
 .home, .request { flex: 1; padding: 28px 20px 18px; }
 .home { text-align: center; }

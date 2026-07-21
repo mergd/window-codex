@@ -23,6 +23,14 @@
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141414; --surface: #1c1c1c; --surface-raised: #242424;
+  --text: #f2f2f2; --text-muted: #9b9b9b; --border: #353535;
+  --accent: #46b8d2; --accent-hover: #68c7dc; --accent-soft: #123039;
+  --success: #55bf7c; --warning: #e0a64d; --danger: #ef7777; --focus: #58c3dc;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 html { background: var(--bg); color: var(--text); font-family: var(--font-sans); }
 body { margin: 0; min-width: 320px; }
