@@ -1,9 +1,9 @@
 :global(*) { box-sizing: border-box; }
 :global(html), :global(body), :global(#root) { min-height: 100%; margin: 0; }
 :global(body) { font-family: "DM Sans", sans-serif; background: #0d0f13; }
-:global(body[data-mode="popup"]) { width: 388px; min-height: 650px; overflow-x: hidden; }
+:global(body[data-mode="popup"]) { width: 388px; height: 650px; min-height: 650px; overflow: hidden; }
 
-.panel { min-height: 100vh; display: flex; flex-direction: column; color: #f3f1eb; background: #0d0f13; }
+.panel { height: 100vh; min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; color: #f3f1eb; background: #0d0f13; }
 .panel > header { height: 60px; display: flex; align-items: center; gap: 11px; padding: 0 16px; border-bottom: 1px solid #292d35; background: #11141a; }
 .logo { width: 30px; height: 30px; object-fit: contain; }
 .panel header > div { flex: 1; min-width: 0; }
@@ -25,8 +25,9 @@
 .account small { margin-top: 2px; color: var(--text-muted); font-size: 10px; }
 .account em { padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted); font-size: 8px; font-style: normal; letter-spacing: .07em; text-transform: uppercase; }
 
-.home, .request { flex: 1; padding: 28px 20px 18px; }
+.home, .request { flex: 1; min-height: 0; padding: 28px 20px 18px; }
 .home { text-align: center; }
+.request { display: flex; flex-direction: column; overflow-y: auto; }
 .heroIcon { display: grid; place-items: center; width: 48px; height: 48px; margin: 8px auto 18px; border: 1px solid #4943aa; border-radius: 11px; color: #8e88ff; background: #171a24; font-size: 18px; font-weight: 750; }
 .home h1, .request h1 { margin: 8px 0 8px; font-size: 24px; font-weight: 450; line-height: 1.16; letter-spacing: -.035em; }
 .home > p, .request > p { margin: 0 0 22px; color: #9399a4; font-size: 13px; line-height: 1.55; }
@@ -50,15 +51,18 @@
 .kicker { color: #8e88ff; text-transform: uppercase; }
 .request h1 { font-size: 25px; }
 .detail, .prompt { display: grid; gap: 9px; margin: 11px 0; padding: 13px; border: 1px solid #2c313b; border-radius: 8px; background: #13161c; }
-.permission { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 28px; }
+.permission { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 9px; min-height: 42px; }
 .permission > span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #4943aa; border-radius: 5px; color: #9a95ff; font-size: 9px; }
-.permission b { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; }
+.permissionCopy { min-width: 0; }
+.permissionCopy b, .permissionCopy small { display: block; }
+.permissionCopy b { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.permissionCopy small { margin-top: 3px; color: #858c98; font-size: 10px; line-height: 1.35; }
 .permission i { color: #858c98; font-size: 10px; font-style: normal; }
 .prompt p { max-height: 132px; margin: 0; overflow: auto; color: #d1d3d7; white-space: pre-wrap; font: 11px/1.55 var(--font-mono); }
 .warning { display: grid; gap: 2px; margin: 10px 0; padding: 9px 10px; border-left: 2px solid #635bff; background: #151821; }
 .warning b { font-size: 11px; }
 .warning span { color: #858c98; font-size: 10px; line-height: 1.4; }
-.actions { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin: 14px -20px -18px; padding: 13px 20px 18px; border-top: 1px solid #292d35; background: #0d0f13; }
+.actions { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin: auto -20px -18px; padding: 13px 20px 18px; border-top: 1px solid #292d35; background: #0d0f13; }
 .reject, .approve { border: 1px solid #343943; border-radius: 8px; padding: 12px; background: #15181e; color: #e2e3e6; font: 650 12px "DM Sans", sans-serif; cursor: pointer; }
 .approve { border-color: #635bff; background: #635bff; color: white; }
 .approve:disabled { opacity: .45; cursor: not-allowed; }
@@ -83,5 +87,21 @@
 .setupSecondary { margin-top: 9px; border: 1px solid #343943; background: #15181e; color: #e2e3e6; }
 .cancelSetup { display: block; margin: 14px auto 0; border: 0; background: none; color: #8b919d; cursor: pointer; font: 11px "DM Sans", sans-serif; }
 .localNote { margin-top: 18px !important; text-align: center; font-size: 10px !important; }
-.panel > footer { display: flex; justify-content: space-between; padding: 11px 16px; border-top: 1px solid #292d35; color: #747b87; background: #101319; font-size: 9px; }
-.panel > footer button { padding: 0; color: #9299a5; font-size: 9px; }
+.loading header button { display: none; }
+.loading .network { justify-content: space-between; }
+.loading .network i { margin: 0; }
+.loading > section { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: var(--space-3); min-height: 58px; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
+.loading > section div { display: grid; gap: 7px; }
+.loading > article { display: grid; gap: 14px; padding: 34px 20px; }
+.skeletonShort, .skeletonMedium, .skeletonLong, .skeletonPill, .skeletonAvatar, .skeletonKicker, .skeletonTitle, .skeletonCard, .skeletonActions i { display: block; border-radius: 5px; background: #252a32; animation: skeletonPulse 1.2s ease-in-out infinite alternate; }
+.skeletonShort { width: 92px; height: 8px; margin-top: 5px !important; }
+.skeletonMedium { width: 116px; height: 9px; }
+.skeletonLong { width: min(210px, 80%); height: 8px; }
+.skeletonPill { width: 48px; height: 20px; }
+.skeletonAvatar { width: 34px; height: 34px; border-radius: 50%; }
+.skeletonKicker { width: 62px; height: 8px; }
+.skeletonTitle { width: 68%; height: 28px; }
+.skeletonCard { width: 100%; height: 96px; margin-top: 10px; }
+.skeletonActions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: auto; padding: 13px 20px 18px; border-top: 1px solid #292d35; }
+.skeletonActions i { height: 42px; border-radius: 8px; }
+@keyframes skeletonPulse { from { opacity: .55; } to { opacity: 1; } }
