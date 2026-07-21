@@ -151,7 +151,10 @@ async function handleProvider(message: { method: CodexMethod; params: any }, sen
   if (!METHODS.includes(message.method)) throw error("UNSUPPORTED_METHOD", `Unsupported method: ${String(message.method)}`);
   const origin = exactOrigin(sender); const tabId = sender.tab!.id!; const current = await grantsFor(origin);
   const preference = await preferenceFor(origin);
-  if (message.method === "provider.info") return { name: "Codemask", protocolVersion: PROTOCOL_VERSION, providerVersion: chrome.runtime.getManifest().version, connected: current.length > 0 };
+  if (message.method === "provider.info") {
+    const runtime = current.length ? await callNative(origin, "provider.info", {}, tabId).catch(() => null) as { profile?: { type: "chatgpt" | "apiKey"; email: string | null; planType: string | null } | null } | null : null;
+    return { name: "Codemask", protocolVersion: PROTOCOL_VERSION, providerVersion: chrome.runtime.getManifest().version, connected: current.length > 0, profile: runtime?.profile ?? null };
+  }
   if (message.method === "capabilities.list") return { methods: METHODS, recipes: ["reflection.v1"] };
   if (preference.blocked && message.method !== "disconnect") throw error("PERMISSION_DENIED", "This site is blocked in Codemask");
   if (message.method === "permissions.get") return { grants: current };

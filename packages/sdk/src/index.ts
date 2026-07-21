@@ -70,7 +70,7 @@ export interface CodexMethodParams {
 }
 
 export interface CodexMethodResults {
-  "provider.info": { name: "Codemask"; protocolVersion: typeof PROTOCOL_VERSION; providerVersion: string; connected: boolean };
+  "provider.info": { name: "Codemask"; protocolVersion: typeof PROTOCOL_VERSION; providerVersion: string; connected: boolean; profile: { type: "chatgpt" | "apiKey"; email: string | null; planType: string | null } | null };
   "capabilities.list": { methods: CodexMethod[]; recipes: ["reflection.v1"] };
   connect: { connected: true; grants: Grant[] };
   disconnect: { disconnected: true };
@@ -165,7 +165,7 @@ export function createMockCodexProvider(): CodexProvider {
   const provider: CodexProvider = {
     protocolVersion: PROTOCOL_VERSION,
     async request({ method, params }: any): Promise<any> {
-      if (method === "provider.info") return { name: "Codemask", protocolVersion: PROTOCOL_VERSION, providerVersion: "mock", connected: grants.length > 0 };
+      if (method === "provider.info") return { name: "Codemask", protocolVersion: PROTOCOL_VERSION, providerVersion: "mock", connected: grants.length > 0, profile: grants.length ? { type: "chatgpt", email: "developer@example.com", planType: "plus" } : null };
       if (method === "capabilities.list") return { methods: ["provider.info", "capabilities.list", "connect", "disconnect", "permissions.get", "permissions.request", "permissions.revoke", "workspace.select", "threads.list", "threads.analyze", "tasks.start", "tasks.get", "tasks.send", "tasks.cancel"], recipes: ["reflection.v1"] };
       if (method === "connect") { const grant: Grant = { id: crypto.randomUUID(), origin: location.origin, scopes: params.scopes, persistence: "persistent", createdAt: now }; grants.push(grant); emit("provider.connected", { origin: location.origin }); return { connected: true, grants }; }
       if (method === "disconnect") { grants.length = 0; emit("provider.disconnected", { reason: "Mock disconnected" }); return { disconnected: true }; }
