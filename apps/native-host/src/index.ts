@@ -16,7 +16,7 @@ const aliases = new Map<string, string>();
 const workspaces = new Map<string, string>();
 const tasks = new Map<string, Task>();
 const usageOwners = new Map<string, { id: string; origin: string }>();
-const turnWaiters = new Map<string, { chunks: string[]; resolve: (text: string) => void; reject: (error: Error) => void }>();
+const turnWaiters = new Map<string, { chunks: string[]; onDelta?: (text: string) => void; resolve: (text: string) => void; reject: (error: Error) => void }>();
 
 function write(value: unknown) { process.stdout.write(encodeNativeMessage(value)); }
 function fail(id: string, code: string, message: string, retryable = false) { write({ id, error: { code, message, data: { retryable } } }); }
@@ -38,7 +38,7 @@ app.on("notification", (message: any) => {
   const threadId = params.threadId ?? params.thread?.id ?? params.turn?.threadId;
   const turnId = params.turnId ?? params.turn?.id;
   const waiter = threadId ? turnWaiters.get(threadId) : undefined;
-  if (message.method === "item/agentMessage/delta" && waiter && typeof params.delta === "string") waiter.chunks.push(params.delta);
+  if (message.method === "item/agentMessage/delta" && waiter && typeof params.delta === "string") { waiter.chunks.push(params.delta); waiter.onDelta?.(waiter.chunks.join("")); }
   if (message.method === "turn/completed" && waiter) { turnWaiters.delete(threadId); waiter.resolve(waiter.chunks.join("")); }
   const task = threadId ? findTaskByRuntime(threadId) : undefined;
   if (message.method === "thread/tokenUsage/updated") {
@@ -60,7 +60,7 @@ function sanitizeApproval(params: any) {
   return { reason: params?.reason ?? null, command: Array.isArray(params?.command) ? params.command.join(" ") : params?.command ?? null, cwd: params?.cwd ? basename(params.cwd) : null, fileCount: Array.isArray(params?.fileChanges) ? params.fileChanges.length : null, questions: params?.questions ?? null };
 }
 
-async function waitForTurn(threadId: string) { return new Promise<string>((resolve, reject) => turnWaiters.set(threadId, { chunks: [], resolve, reject })); }
+async function waitForTurn(threadId: string, onDelta?: (text: string) => void) { return new Promise<string>((resolve, reject) => turnWaiters.set(threadId, { chunks: [], onDelta, resolve, reject })); }
 
 async function handle(message: HostMessage) {
   if ("type" in message) { app.respond(Number(message.id), message.result ?? { decision: message.decision ?? "decline" }); return; }
@@ -83,7 +83,7 @@ async function handle(message: HostMessage) {
       const data = threads.map((thread: any, index: number) => ({ id: alias(origin, "thread", thread.id), title: thread.name || thread.preview || "Untitled Codex task", createdAt: thread.createdAt ?? 0, updatedAt: thread.updatedAt ?? thread.createdAt ?? 0, turnCount: turnCounts[index], workspaceLabel: thread.cwd ? basename(thread.cwd) : null }));
       write({ id, result: { data, nextCursor: response.nextCursor ?? null } }); return;
     }
-    if (method === "threads.analyze") { write({ id, result: await analyze(origin, params.threadIds) }); return; }
+    if (method === "threads.analyze") { write({ id, result: await analyze(origin, params.threadIds, id) }); return; }
     if (method === "tasks.start") { write({ id, result: await startTask(origin, params) }); return; }
     if (method === "tasks.get") { const task = tasks.get(params.taskId); if (!task || task.origin !== origin) throw Object.assign(new Error("Task not found"), { code: "TASK_NOT_FOUND" }); write({ id, result: snapshot(task) }); return; }
     if (method === "tasks.send") { const task = ownedTask(origin, params.taskId); const response = await app.request("turn/start", { threadId: task.runtimeThreadId, input: input(params.message) }); task.runtimeTurnId = response.turn?.id ?? task.runtimeTurnId; task.status = "pending"; task.updatedAt = Date.now() / 1000; write({ id, result: snapshot(task) }); return; }
@@ -102,18 +102,27 @@ async function startTask(origin: string, params: any) {
   task.runtimeTurnId = turn.turn.id; return snapshot(task);
 }
 
-async function analyze(origin: string, threadIds: string[]) {
+async function analyze(origin: string, threadIds: string[], analysisId: string) {
   const runtimeIds = threadIds.map(value => resolveAlias(origin, "thread", value)).filter(Boolean) as string[];
   if (runtimeIds.length !== threadIds.length) throw Object.assign(new Error("The thread selection is invalid or expired"), { code: "INVALID_SELECTOR" });
-  let truncatedThreads = 0;
+  let truncatedThreads = 0; let readCount = 0;
+  analysisProgress(origin, { analysisId, phase: "reading", message: `Reading ${runtimeIds.length} conversations`, completed: 0, total: runtimeIds.length, text: "" });
   const histories = await mapConcurrent(runtimeIds, 8, async (runtimeId, index) => {
     const response = await app.request("thread/read", { threadId: runtimeId, includeTurns: true });
     let encoded = JSON.stringify(response.thread); if (encoded.length > 32_000) { encoded = encoded.slice(-32_000); truncatedThreads += 1; }
+    readCount += 1; analysisProgress(origin, { analysisId, phase: "reading", message: `Read ${readCount} of ${runtimeIds.length} conversations`, completed: readCount, total: runtimeIds.length, text: "" });
     return { id: threadIds[index], content: encoded, turnCount: Array.isArray(response.thread?.turns) ? response.thread.turns.length : 0, createdAt: response.thread?.createdAt ?? 0, updatedAt: response.thread?.updatedAt ?? response.thread?.createdAt ?? 0 };
   });
   const batches = Array.from({ length: Math.ceil(histories.length / 4) }, (_, index) => histories.slice(index * 4, index * 4 + 4));
-  const summaries = await mapConcurrent(batches, 2, async (batch, index) => runReflectionPass(origin, `Analyze batch ${index + 1} of ${batches.length} from a complete Codex history. Identify 4-8 specific themes, recurring friction, and actionable improvements. Never quote transcript text. Use only the supplied opaque thread IDs as evidence.\n\n${JSON.stringify(batch.map(({ id, content }) => ({ id, content })))}`));
-  const parsed = summaries.length === 1 ? summaries[0] : await runReflectionPass(origin, `Synthesize these batch-level reflections into one detailed account-wide reflection. Consolidate duplicates, preserve important minority patterns, and return 5-10 themes, 5-10 friction points, and 5-10 concrete suggestions. Never invent or quote transcript text. Evidence must use only opaque thread IDs present in the summaries.\n\n${JSON.stringify(summaries)}`);
+  const liveBatches = new Map<number, string>(); let completedBatches = 0;
+  const summaries = await mapConcurrent(batches, 2, async (batch, index) => {
+    const summary = await runReflectionPass(origin, `Analyze batch ${index + 1} of ${batches.length} from a complete Codex history. Identify 4-8 specific themes, recurring friction, and actionable improvements. Never quote transcript text. Use only the supplied opaque thread IDs as evidence.\n\n${JSON.stringify(batch.map(({ id, content }) => ({ id, content })))}`, partial => {
+      liveBatches.set(index, partial); analysisProgress(origin, { analysisId, phase: "analyzing", message: `Analyzing history in ${batches.length} batches`, completed: completedBatches, total: batches.length, text: [...liveBatches.entries()].sort(([left], [right]) => left - right).map(([, text]) => text).filter(Boolean).join("\n\n").slice(-6000) });
+    });
+    completedBatches += 1; analysisProgress(origin, { analysisId, phase: "analyzing", message: `Analyzed ${completedBatches} of ${batches.length} batches`, completed: completedBatches, total: batches.length, text: [...liveBatches.values()].filter(Boolean).join("\n\n").slice(-6000) });
+    return summary;
+  });
+  const parsed = summaries.length === 1 ? summaries[0] : await runReflectionPass(origin, `Synthesize these batch-level reflections into one detailed account-wide reflection. Consolidate duplicates, preserve important minority patterns, and return 5-10 themes, 5-10 friction points, and 5-10 concrete suggestions. Never invent or quote transcript text. Evidence must use only opaque thread IDs present in the summaries.\n\n${JSON.stringify(summaries)}`, partial => analysisProgress(origin, { analysisId, phase: "synthesizing", message: "Synthesizing the account-wide reflection", completed: 0, total: 1, text: partial }));
   const timestamps = histories.flatMap(history => [history.createdAt, history.updatedAt]).filter(Boolean);
   const activeDays = new Set(histories.filter(history => history.updatedAt).map(history => new Date(history.updatedAt * 1000).toISOString().slice(0, 10))).size;
   parsed.coverage = { ...(parsed.coverage ?? {}), selectedThreads: threadIds.length, analyzedThreads: histories.length, truncatedThreads, from: timestamps.length ? new Date(Math.min(...timestamps) * 1000).toISOString() : null, to: timestamps.length ? new Date(Math.max(...timestamps) * 1000).toISOString() : null };
@@ -121,12 +130,21 @@ async function analyze(origin: string, threadIds: string[]) {
   return parsed;
 }
 
-async function runReflectionPass(origin: string, prompt: string) {
+function analysisProgress(origin: string, payload: { analysisId: string; phase: "reading" | "analyzing" | "synthesizing"; message: string; completed: number; total: number; text: string }) { event("analysis.progress", { origin, ...payload }); }
+
+function readableReflection(partial: string) {
+  const values: string[] = []; const pattern = /"(?:label|description|title|rationale)"\s*:\s*"((?:\\.|[^"\\])*)"/g; let match: RegExpExecArray | null;
+  while ((match = pattern.exec(partial))) { try { const value = JSON.parse(`"${match[1]}"`); if (typeof value === "string" && !values.includes(value)) values.push(value); } catch { /* wait for a complete JSON string */ } }
+  return values.join("\n");
+}
+
+async function runReflectionPass(origin: string, prompt: string, onProgress?: (text: string) => void) {
   const cwd = await mkdtemp(`${tmpdir()}/window-codex-analysis-`);
   const thread = await app.request("thread/start", { cwd, ephemeral: true, approvalPolicy: "never", sandbox: "read-only", serviceName: "window_codex_analysis", developerInstructions: "Analyze only the supplied JSON. Do not use tools or inspect the filesystem. Return only JSON matching the requested schema." });
   usageOwners.set(thread.thread.id, { id: `analysis:${randomUUID()}`, origin });
   const outputSchema = reflectionSchema();
-  const completion = waitForTurn(thread.thread.id);
+  let lastProgress = "";
+  const completion = waitForTurn(thread.thread.id, partial => { const readable = readableReflection(partial); if (readable && readable !== lastProgress) { lastProgress = readable; onProgress?.(readable); } });
   await app.request("turn/start", { threadId: thread.thread.id, input: input(prompt), outputSchema });
   const text = await completion;
   return JSON.parse(text.trim().replace(/^```json\s*|\s*```$/g, ""));

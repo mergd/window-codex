@@ -8,7 +8,7 @@ type SiteAction = { method: string; label: string; at: number };
 type SiteActivity = { origin: string; scopes: PermissionScope[]; actionCount: number; inputTokens: number; outputTokens: number; totalTokens: number; connectedAt: number; lastActiveAt: number; recentActions: SiteAction[] };
 type TaskUsage = { origin: string; inputTokens: number; outputTokens: number; totalTokens: number };
 const pending = new Map<string, Pending>();
-const nativeRequests = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const nativeRequests = new Map<string, { tabId?: number; resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 let nativePort: chrome.runtime.Port | null = null;
 let approvalWindowId: number | undefined;
 let activityWrite: Promise<void> = Promise.resolve();
@@ -113,7 +113,12 @@ function getNativePort() {
   if (nativePort) return nativePort;
   nativePort = chrome.runtime.connectNative("com.window.codex");
   nativePort.onMessage.addListener(message => {
-    if (message.type === "event") { if (message.event === "internal.usage") void recordUsage(message.payload); else void broadcast(message.event, message.payload); return; }
+    if (message.type === "event") {
+      if (message.event === "internal.usage") void recordUsage(message.payload);
+      else if (message.event === "analysis.progress" && message.payload?.analysisId) { const request = nativeRequests.get(message.payload.analysisId); const { origin: _origin, ...payload } = message.payload; if (request?.tabId) void chrome.tabs.sendMessage(request.tabId, { type: "provider.event", event: message.event, payload }).catch(() => undefined); }
+      else void broadcast(message.event, message.payload);
+      return;
+    }
     if (message.type === "approval") {
       void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(tabs => {
         const tabId = tabs[0]?.id;
@@ -132,7 +137,7 @@ function getNativePort() {
   return nativePort;
 }
 
-function callNative(origin: string, method: CodexMethod, params: unknown) { const id = crypto.randomUUID(); return new Promise((resolve, reject) => { nativeRequests.set(id, { resolve, reject }); try { getNativePort().postMessage({ id, origin, method, params }); } catch (cause) { nativeRequests.delete(id); reject(Object.assign(new Error(String(cause)), error("RUNTIME_UNAVAILABLE", "Could not reach the local Codex bridge", true))); } }); }
+function callNative(origin: string, method: CodexMethod, params: unknown, tabId?: number) { const id = crypto.randomUUID(); return new Promise((resolve, reject) => { nativeRequests.set(id, { tabId, resolve, reject }); try { getNativePort().postMessage({ id, origin, method, params }); } catch (cause) { nativeRequests.delete(id); reject(Object.assign(new Error(String(cause)), error("RUNTIME_UNAVAILABLE", "Could not reach the local Codex bridge", true))); } }); }
 async function broadcast(event: string, payload: unknown) { for (const tab of await chrome.tabs.query({})) if (tab.id) void chrome.tabs.sendMessage(tab.id, { type: "provider.event", event, payload }).catch(() => undefined); }
 
 async function handleProvider(message: { method: CodexMethod; params: any }, sender: chrome.runtime.MessageSender) {
@@ -161,7 +166,7 @@ async function handleProvider(message: { method: CodexMethod; params: any }, sen
   if (message.method === "threads.analyze") {
     if (!Array.isArray(message.params.threadIds) || message.params.threadIds.length < 1) throw error("INVALID_SELECTOR", "Select at least one thread");
   }
-  return callNative(origin, message.method, message.params);
+  return callNative(origin, message.method, message.params, tabId);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

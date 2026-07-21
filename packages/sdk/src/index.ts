@@ -92,6 +92,7 @@ export interface CodexEventPayloads {
   "provider.connected": { origin: string };
   "provider.disconnected": { reason: string };
   "permissions.changed": { grants: Grant[] };
+  "analysis.progress": { analysisId: string; phase: "reading" | "analyzing" | "synthesizing"; message: string; completed: number; total: number; text: string };
   "task.started": { task: TaskSnapshot };
   "task.event": { taskId: string; sequence: number; kind: "agentMessage" | "status"; text: string };
   "task.completed": { task: TaskSnapshot };
